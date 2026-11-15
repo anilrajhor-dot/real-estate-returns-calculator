@@ -2,148 +2,175 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Property Returns Calculator (World Bank data)</title>
+<title>Property Investment Analysis Tool</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <style>
 :root{--bg:#F5F4EF;--card:#fff;--ink:#1B2B27;--mut:#5E6B66;--line:#D9D7CC;--g:#1C3A32;--gold:#9C7A2E;--neg:#A63A2E;--pos:#1F7A4D;--hero:#1C3A32;--herot:#F5F4EF}
 @media (prefers-color-scheme:dark){:root{--bg:#0F1A17;--card:#17262F;--ink:#E7EEEA;--mut:#98A8A2;--line:#2A3B36;--g:#5FAF98;--gold:#D3B15F;--neg:#F08A7E;--pos:#6FD19A;--hero:#0A1210;--herot:#E7EEEA}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
-.w{max-width:780px;margin:0 auto;padding:16px}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+.w{max-width:1000px;margin:0 auto;padding:16px}
 h1,h2,.big{font-family:Georgia,"Times New Roman",serif;font-weight:600}
-h1{font-size:1.8rem;line-height:1.15;margin:8px 0}h2{font-size:1.2rem;margin:22px 0 6px}
-.hint{color:var(--mut);font-size:.88rem;margin:2px 0 8px}
-label{display:block;font-weight:600;margin-top:14px}
-input,select,button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%}
-input[type=checkbox]{width:auto;accent-color:var(--g)}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-button{cursor:pointer;background:var(--g);color:#fff;border-color:var(--g);width:auto;margin:10px 8px 0 0}
+h1{font-size:1.8rem;line-height:1.15;margin:8px 0}h2{font-size:1.2rem;margin:24px 0 6px}
+.hint{color:var(--mut);font-size:.85rem;margin:2px 0 6px}
+label{display:block;font-weight:600;font-size:.92rem;margin-top:12px}
+input,select,button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:9px 11px;width:100%}
+button{cursor:pointer;background:var(--g);color:#fff;border-color:var(--g);width:auto;margin:8px 8px 0 0}
 button.g{background:var(--card);color:var(--ink);border-color:var(--line)}
 :focus-visible{outline:3px solid var(--gold);outline-offset:2px}
-section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px 16px 16px;margin-top:14px}
-#st{padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);font-size:.9rem;margin-top:10px}
+.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+fieldset{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:2px 14px 14px;margin:0}
+legend{font-weight:700;padding:0 6px}
+#st{padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);font-size:.88rem;margin:8px 0}
 #st.err{border-color:var(--neg)}#st.ok{border-color:var(--pos)}
 .sc{overflow-x:auto}
-table{border-collapse:collapse;width:100%;font-size:.85rem;font-variant-numeric:tabular-nums}
-th,td{padding:5px 6px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+table{border-collapse:collapse;width:100%;font-size:.82rem;font-variant-numeric:tabular-nums}
+th,td{padding:5px 7px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
 th:first-child,td:first-child{text-align:left}
-td input{min-width:92px;padding:6px 8px;font-size:16px}
-.src{font-size:.75rem;color:var(--mut)}
-.hero{background:var(--hero);color:var(--herot);border-radius:14px;padding:18px;display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
-.big{font-size:2.3rem;line-height:1.1}.hero small{display:block;opacity:.8}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0}
-.m{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
-.m b{display:block;font-size:1.1rem}.m span{font-size:.82rem;color:var(--mut)}
-.note{background:var(--card);border-left:4px solid var(--gold);border-radius:6px;padding:8px 12px;margin:8px 0;font-size:.92rem}
+td.p{background:rgba(31,122,77,.2)}td.n{background:rgba(166,58,46,.2)}td.w{background:rgba(156,122,46,.22)}td.c{outline:2px solid var(--ink);outline-offset:-2px}
+.hero{background:var(--hero);color:var(--herot);border-radius:14px;padding:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:12px}
+.big{font-size:2.2rem;line-height:1.1}.hero small{display:block;opacity:.8}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:12px 0}
+.m{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+.m b{display:block;font-size:1.05rem}.m span{font-size:.8rem;color:var(--mut)}
+.note{background:var(--card);border-left:4px solid var(--gold);border-radius:6px;padding:8px 12px;margin:8px 0;font-size:.9rem}
 .note.bad{border-color:var(--neg)}.note.ok{border-color:var(--pos)}
-footer{color:var(--mut);font-size:.8rem;margin:20px 0}a{color:var(--g)}
+.tag{font-size:.7rem;font-weight:600;border-radius:4px;padding:0 5px;margin-left:5px;border:1px solid var(--line);color:var(--mut)}
+footer{color:var(--mut);font-size:.78rem;margin:20px 0}
+@media print{body{background:#fff}button,#inp,#st{display:none}.w{max-width:none}}
 </style>
 </head>
 <body>
 <div class="w">
-<h1>Property returns calculator</h1>
-<p class="hint">Pick a country. Inflation, lending rates and deposit rates load from the World Bank, year by year.</p>
+<h1>Property investment analysis tool</h1>
+<p class="hint">Evaluate a property with a home loan, tax and inflation, then compare it with fixed deposits, bonds and mutual funds. <span class="tag">Actual</span> World Bank data, <span class="tag">Estimate</span> model defaults, <span class="tag">Assumption</span> your inputs.</p>
 <div id="st">Loading World Bank data…</div>
-<button id="retry" class="g" type="button" hidden>Retry World Bank</button><button id="sv" class="g" type="button">Save all countries offline</button><button id="ex" type="button">Load example</button><button class="g" id="rs" type="button">Reset</button>
-
-<section><h2>1. Property and purchase</h2>
-<label for="cty">Country</label><select id="cty"></select>
-<label for="cc">Currency code</label><input id="cc" maxlength="3" placeholder="e.g. INR">
-<p class="hint">Filled for common countries. World Bank data is in percentages, so no currency conversion is used.</p>
-<div class="row"><div><label for="py">Purchase year</label><input id="py" type="number" inputmode="numeric" placeholder="e.g. 2015"></div>
-<div><label for="ey">Evaluation or sale year</label><input id="ey" type="number" inputmode="numeric" placeholder="e.g. 2026"></div></div>
-<label for="price">Purchase price</label><input id="price" type="number" inputmode="decimal" placeholder="0">
-<label for="extra">Additional purchase costs</label><input id="extra" type="number" inputmode="decimal" placeholder="0">
-<p class="hint">Registration, stamp duty, interiors, renovations and other initial expenses.</p>
-<label for="exitv">Current value, or net sale proceeds if sold</label><input id="exitv" type="number" inputmode="decimal" placeholder="0">
-<p class="hint">After brokerage and other sale costs. The World Bank has no property prices, so this stays your input.</p></section>
-
-<section><h2>2. Loan</h2>
-<label><input type="checkbox" id="ln"> Include a loan</label>
-<div id="lnf" hidden><div class="row"><div><label for="L">Loan amount</label><input id="L" type="number" inputmode="decimal"></div>
-<div><label for="rate">Interest rate (% a year)</label><input id="rate" type="number" inputmode="decimal" step="any"></div></div>
-<p class="hint" id="rh"></p>
-<label for="term">Loan term (years)</label><input id="term" type="number" inputmode="numeric">
-<p class="hint">Loan arrives in the purchase year. Twelve instalments are counted for each year from purchase to evaluation.</p></div></section>
-
-<section><h2>3. Yearly income and costs</h2>
-<div class="row"><div><label for="r1">First-year rent received or saved</label><input id="r1" type="number" inputmode="decimal"></div>
-<div><label for="gr">Rent growth (% a year)</label><input id="gr" type="number" step="any"></div></div>
-<button class="g" id="fill" type="button">Fill rent for all years</button>
-<label for="inf">Inflation used when World Bank has no figure (%)</label><input id="inf" type="number" step="any">
-<p class="hint">Years without a published figure carry forward the latest earlier year. You can overwrite any year.</p>
-<div id="tbl"></div></section>
-
+<div style="display:flex;flex-wrap:wrap"><select id="cty" aria-label="Country for World Bank data" style="width:auto;margin-top:8px"></select><button class="g" id="retry" type="button">Reload World Bank</button><button class="g" id="sv" type="button">Save all countries offline</button><button class="g" id="tests" type="button">Run formula tests</button></div>
+<div id="tr"></div>
+<div id="inp" class="f" style="margin-top:12px"></div>
+<div id="err"></div>
 <div id="out" aria-live="polite"></div>
-<footer>Data: World Bank Indicators API, consumer inflation (FP.CPI.TOTL.ZG), lending interest rate (FR.INR.LEND), deposit interest rate (FR.INR.DPST). Indicative estimates only. Not investment, tax or legal advice. Taxes are excluded unless entered as tax benefits.</footer>
+<div id="btns" hidden><button id="pdf" type="button">Save as PDF</button><button class="g" id="xls" type="button">Download Excel report</button></div>
+<footer>Indicative estimates, not investment, tax or legal advice. Tax model is simplified for resident individuals in India: rental income after 30% standard deduction and loan interest at slab rate plus 4% cess, with losses not set off; capital gains without indexation (long term if held over 24 months), plus 4% cess. Rules and state stamp duty change, so confirm with a qualified adviser. World Bank: FP.CPI.TOTL.ZG inflation, FR.INR.LEND lending rate, FR.INR.DPST deposit rate.</footer>
 </div>
 <script>
-const $=id=>document.getElementById(id);
-const CUR={IN:"INR",US:"USD",GB:"GBP",AE:"AED",AU:"AUD",SG:"SGD",CA:"CAD",JP:"JPY",CN:"CNY",SA:"SAR",ZA:"ZAR",NZ:"NZD",CH:"CHF",BR:"BRL",MX:"MXN",ID:"IDR",MY:"MYR",TH:"THB",PK:"PKR",BD:"BDT",LK:"LKR",NP:"NPR",KE:"KES",NG:"NGN",DE:"EUR",FR:"EUR",IT:"EUR",ES:"EUR",NL:"EUR",IE:"EUR",PT:"EUR"};
-const BASE="https://api.worldbank.org/v2/";
-const FB={IND:{1990:8.97,1991:13.87,1992:11.79,1993:6.33,1994:10.25,1995:10.22,1996:8.98,1997:7.16,1998:13.23,1999:4.67,2000:4.01,2001:3.78,2002:4.30,2003:3.81,2004:3.77,2005:4.25,2006:5.80,2007:6.37,2008:8.35,2009:10.88,2010:11.99,2011:8.91,2012:9.48,2013:10.02,2014:6.67,2015:4.91,2016:4.95,2017:3.33,2018:3.94,2019:3.73,2020:6.62,2021:5.13,2022:6.70,2023:5.65,2024:4.95,2025:2.40}};
-let rows=[],W={inf:{},lend:{},dep:{}},iso2={},rateEdited=false;
-const mo=x=>{const c=$("cc").value.trim().toUpperCase(),v=Math.round(x);try{return new Intl.NumberFormat(undefined,c.length==3?{style:"currency",currency:c,maximumFractionDigits:0}:{maximumFractionDigits:0}).format(v)}catch(e){return v.toLocaleString()}};
-const pc=x=>isFinite(x)?(x*100).toFixed(1)+"%":"n/a";
-const num=id=>parseFloat($(id).value)||0;
-const st=(t,c)=>{$("st").textContent=t;$("st").className=c||"";$("retry").hidden=c!="err"};
-async function wb(c,ind){const r=await fetch(`${BASE}country/${c}/indicator/${ind}?format=json&per_page=200&date=1990:${new Date().getFullYear()}`);if(!r.ok)throw 0;const j=await r.json(),o={};(j[1]||[]).forEach(d=>{if(d.value!=null)o[+d.date]=d.value});return o}
-async function bulk(ind){const r=await fetch(`${BASE}country/all/indicator/${ind}?format=json&per_page=20000&date=1990:${new Date().getFullYear()}`);if(!r.ok)throw 0;const j=await r.json(),o={};(j[1]||[]).forEach(d=>{if(d.value!=null&&d.countryiso3code)(o[d.countryiso3code]=o[d.countryiso3code]||{})[+d.date]=+(+d.value).toFixed(3)});return o}
-function getCache(){try{return JSON.parse(localStorage.getItem("wbcache"))}catch(e){return null}}
-async function cacheAll(){try{const [inf,lend,dep]=await Promise.all([bulk("FP.CPI.TOTL.ZG"),bulk("FR.INR.LEND").catch(()=>({})),bulk("FR.INR.DPST").catch(()=>({}))]);localStorage.setItem("wbcache",JSON.stringify({t:Date.now(),inf,lend,dep}));return Object.keys(inf).length}catch(e){return 0}}
-const latest=o=>{const k=Object.keys(o).map(Number).sort((a,b)=>b-a)[0];return k?[k,o[k]]:null};
-async function load(){const c=$("cty").value;st("Loading World Bank data…");
-try{const [a,b,d]=await Promise.all([wb(c,"FP.CPI.TOTL.ZG"),wb(c,"FR.INR.LEND").catch(()=>({})),wb(c,"FR.INR.DPST").catch(()=>({}))]);W={inf:a,lend:b,dep:d};
-const li=latest(a),ll=latest(b);
-if(li)$("inf").value=li[1].toFixed(2);
-if(ll&&!rateEdited)$("rate").value=ll[1].toFixed(2);
-$("rh").textContent=ll?`World Bank lending rate: ${ll[1].toFixed(2)}% (${ll[0]}). Edit to match your loan.`:"No World Bank lending rate for this country. Enter your loan rate.";
-st(li?`World Bank loaded. Latest inflation: ${li[1].toFixed(2)}% (${li[0]}).`:"No World Bank inflation data for this country. Enter inflation by year.",li?"ok":"err");
-const k0=getCache();if(!k0||Date.now()-k0.t>2592e6)cacheAll();
-}catch(e){const k=getCache(),s=k&&k.inf[c]?k:null;W={inf:s?s.inf[c]:(FB[c]||{}),lend:(s&&s.lend[c])||{},dep:(s&&s.dep[c])||{}};const li=latest(W.inf),ll=latest(W.lend);if(li)$("inf").value=li[1].toFixed(2);if(ll&&!rateEdited)$("rate").value=ll[1].toFixed(2);
-st(li?`Offline: using ${s?"data saved on "+new Date(s.t).toLocaleDateString():"built-in India data"} for ${$("cty").selectedOptions[0].text}, up to ${li[0]}. Retry for live data.`:"Could not reach the World Bank and no saved data exists for this country. Open this file from your own website or browser, connect once to save data, or type inflation by year.","err")}
-applyWB();run()}
-function applyWB(){const ks=Object.keys(W.inf).map(Number).sort((a,b)=>a-b);rows.forEach((r,i)=>{if(i==0||r.src=="user")return;if(W.inf[r.y]!=null){r.inf=W.inf[r.y];r.src="wb"}else{const p=ks.filter(k=>k<r.y).pop();r.inf=p!=null?W.inf[p]:num("inf");r.src=p!=null?"carried":"fallback"}});draw()}
-function years(){const py=Math.round(num("py")),ey=Math.round(num("ey"));return py>1900&&ey>py&&ey-py<=50?[py,ey]:null}
-function sync(){const ys=years();if(!ys){rows=[];$("tbl").innerHTML='<p class="hint">Enter a purchase year and a later evaluation year to add yearly amounts.</p>';return}
-const old=Object.fromEntries(rows.map(r=>[r.y,r]));rows=[];for(let y=ys[0];y<=ys[1];y++)rows.push(old[y]||{y,inc:0,exp:0,tax:0,inf:0,src:""});applyWB()}
-const SL={wb:"World Bank",carried:"carried forward",fallback:"fallback",user:"edited","":""};
-function draw(){if(!rows.length)return;$("tbl").innerHTML=`<div class="sc"><table><tr><th>Year</th><th>Rent received or saved</th><th>Maintenance and costs</th><th>Tax benefit</th><th>Inflation %</th><th>Inflation source</th></tr>${rows.map((r,i)=>`<tr><td>${r.y}</td>${["inc","exp","tax","inf"].map(k=>`<td><input type="number" inputmode="decimal" step="any" data-i="${i}" data-k="${k}" value="${k=="inf"?(+r.inf).toFixed(2):r[k]}" aria-label="${k} ${r.y}" ${k=="inf"&&i==0?"disabled":""}></td>`).join("")}<td class="src">${i?SL[r.src]:"base year"}</td></tr>`).join("")}</table></div>`}
-function irr(cf){const f=r=>cf.reduce((a,c,i)=>a+c/Math.pow(1+r,i),0);let lo=-.99,hi=10;if(f(lo)*f(hi)>0)return NaN;for(let i=0;i<120;i++){const m=(lo+hi)/2;f(lo)*f(m)<=0?hi=m:lo=m}return(lo+hi)/2}
-function run(){const ys=years();if(!ys||!rows.length){$("out").innerHTML="";return}
-const N=ys[1]-ys[0],price=num("price"),extra=num("extra"),ex=num("exitv"),on=$("ln").checked;
-const net=rows.map(r=>r.inc+r.tax-r.exp),U=net.slice();U[0]-=price+extra;U[N]+=ex;
-let L=on?Math.min(num("L"),price):0,rt=num("rate")/1200,n=Math.max(1,num("term"))*12,pm=L?(rt?L*rt/(1-Math.pow(1+rt,-n)):L/n):0,bal=L,m=0;const emi=[];
-for(let t=0;t<=N;t++){let p=0;for(let k=0;k<12;k++){if(m<n&&bal>0){const i=bal*rt,pay=Math.min(pm,bal+i);p+=pay;bal-=pay-i}m++}emi.push(p)}
-const Lv=U.map((c,t)=>c-emi[t]);Lv[0]+=L;Lv[N]-=bal;
-const D=[1];for(let t=1;t<=N;t++)D.push(D[t-1]*(1+rows[t].inf/100));
+//ENGINE
+const pmt=(P,r,n)=>!P?0:r?P*r/(1-Math.pow(1+r,-n)):P/n;
+function sched(P,rate,years,months){const r=rate/1200,n=Math.round(years*12),e=pmt(P,r,n);let b=P;const Y=[];
+for(let y=0;y<Math.ceil(months/12);y++){let i=0,p=0;for(let k=0;k<12&&y*12+k<months;k++){if(b>1e-9&&y*12+k<n){const ii=b*r,pp=Math.min(e-ii,b);i+=ii;p+=pp;b-=pp}}Y.push({i,p,e:i+p,b:Math.max(0,b)})}
+return{emi:e,Y}}
+function root(f){let lo=-.99,hi=10;if(!(f(lo)*f(hi)<0))return NaN;for(let k=0;k<200;k++){const m=(lo+hi)/2;f(lo)*f(m)<=0?hi=m:lo=m}return(lo+hi)/2}
+const irr=cf=>root(r=>cf.reduce((a,c,i)=>a+c/Math.pow(1+r,i),0));
+const xirr=(cf,d)=>root(r=>cf.reduce((a,c,i)=>a+c/Math.pow(1+r,(d[i]-d[0])/864e5/365),0));
+const cagr=(s,e,n)=>s>0&&e>0&&n>0?Math.pow(e/s,1/n)-1:NaN;
+function calc(p){
+const N=p.N,P=p.price,buy=P*(p.stamp+p.reg+p.brok)/100,up=P+buy+p.reno,L=P*p.ltv/100,eq=up-L,S=sched(L,p.rate,p.term,N*12);
+const D=[1];for(let t=1;t<=N;t++)D.push(D[t-1]*(1+p.inf[t-1]/100));
+const g=p.exitv>0?Math.pow(p.exitv/P,1/N)-1:p.app/100,tx=p.slab*1.04/100;
+let v=P;const rows=[],cfU=[-up],cfL=[-eq],val=[P],bal=[L];
+for(let t=1;t<=N;t++){const rent=p.rent*12*Math.pow(1+p.rg/100,t-1),eff=rent*(1-p.vac/100),mt=p.maint*12*D[t],ox=eff*p.opex/100,pt=v*p.ptax/100,noi=eff-mt-ox-pt,y=S.Y[t-1]||{i:0,p:0,e:0,b:0};
+const base=0.7*(eff-pt),tU=Math.max(0,base)*tx,tL=Math.max(0,base-y.i)*tx;
+cfU.push(noi-tU);cfL.push(noi-tL-y.e);v*=1+g;val.push(v);bal.push(y.b);
+rows.push({t,rent,eff,mt,ox,pt,noi,tax:tL,i:y.i,p:y.p,e:y.e,cf:noi-tL-y.e,bal:y.b,v})}
+const exit=p.exitv>0?p.exitv:P*Math.pow(1+g,N),sale=exit*(1-p.sbrok/100),gain=sale-up,cgr=(N>=2?p.ltcg:p.slab)*1.04/100,cg=Math.max(0,gain)*cgr,bN=bal[N];
+cfU[N]+=sale-cg;cfL[N]+=sale-cg-bN;
 const re=a=>a.map((c,t)=>c/D[t]),sum=a=>a.reduce((x,y)=>x+y,0);
-const iU=irr(U),iL=irr(Lv),rU=irr(re(U)),rL=irr(re(Lv)),inv=-sum(U.filter(c=>c<0)),invL=-sum(Lv.filter(c=>c<0)),notes=[];
-const dv=[];for(let y=ys[0]+1;y<=ys[1];y++)if(W.dep[y]!=null)dv.push(W.dep[y]);
-const dep=dv.length?dv.reduce((a,b)=>a+b,0)/dv.length/100:NaN;
-if(!ex)notes.push(["bad","Enter the current value or net sale proceeds, or the result will show a total loss."]);
-if(isFinite(dep)&&isFinite(iU))notes.push([iU>dep?"ok":"bad",`Bank deposits paid about ${pc(dep)} a year on average (World Bank, ${dv.length} of ${N} years available). The property returned ${pc(iU)} without a loan, so it ${iU>dep?"beat":"trailed"} deposits.`]);
-if(on&&L)notes.push([iU<rt*12?"bad":"ok",`The loan costs ${(rt*1200).toFixed(1)}% a year and the property earned about ${pc(iU)} without it, so the loan ${iU<rt*12?"lowered":"raised"} your return.`]);
-const miss=rows.slice(1).filter(r=>r.src=="carried"||r.src=="fallback").map(r=>r.y);
-if(miss.length)notes.push(["",`No World Bank inflation yet for ${miss.join(", ")}. Earlier values were carried forward. Update them when published.`]);
-const h=(t,a,b)=>`<div><small>${t}</small><div class="big">${pc(a)}</div><small>${pc(b)} after inflation</small></div>`;
-$("out").innerHTML=`<div class="hero">${h("Return without a loan",iU,rU)}${on&&L?h("Return on your cash, with loan",iL,rL):`<div><small>With a loan</small><div class="big">–</div><small>Switch on a loan to compare</small></div>`}</div>
-<div class="grid"><div class="m"><span>Total cash put in</span><b>${mo(inv)}</b></div><div class="m"><span>Net gain, nominal</span><b>${mo(sum(U))}</b></div><div class="m"><span>Net gain, purchase-year money</span><b>${mo(sum(re(U)))}</b></div><div class="m"><span>Total inflation over the period</span><b>${pc(D[N]-1)}</b></div>${isFinite(dep)?`<div class="m"><span>Average deposit rate</span><b>${pc(dep)}</b></div>`:""}${on&&L?`<div class="m"><span>Your cash with loan</span><b>${mo(invL)}</b></div><div class="m"><span>Loan balance at exit</span><b>${mo(bal)}</b></div><div class="m"><span>Net gain with loan</span><b>${mo(sum(Lv))}</b></div>`:""}</div>
-${notes.map(([c,t])=>`<div class="note ${c}">${t}</div>`).join("")}
-<h2>Cash flows by year</h2><div class="sc"><table><tr><th>Year</th><th>Net income</th><th>Loan instalments</th><th>Without loan</th><th>With loan</th><th>Inflation index</th></tr>${U.map((c,t)=>`<tr><td>${rows[t].y}</td><td>${mo(net[t])}</td><td>${mo(-emi[t])}</td><td>${mo(c)}</td><td>${mo(Lv[t])}</td><td>${D[t].toFixed(3)}</td></tr>`).join("")}</table></div>`}
-document.addEventListener("input",e=>{const t=e.target;if(t.dataset.k){const r=rows[t.dataset.i];r[t.dataset.k]=parseFloat(t.value)||0;if(t.dataset.k=="inf")r.src="user"}else if(t.id=="py"||t.id=="ey")sync();else if(t.id=="rate")rateEdited=true;run()});
-$("ln").onchange=()=>{$("lnf").hidden=!$("ln").checked;run()};
-$("cty").onchange=()=>{$("cc").value=CUR[iso2[$("cty").value]]||"";rows.forEach(r=>{if(r.src!="user")r.src=""});load()};
-$("retry").onclick=load;
-$("sv").onclick=async()=>{st("Downloading data for all countries…");const n=await cacheAll();st(n?`Saved inflation data for ${n} countries and regions on this device. They now work offline.`:"Could not download or save. Check your connection and try again.",n?"ok":"err")};
-$("fill").onclick=()=>{if(!rows.length)return;const r1=num("r1"),g=num("gr")/100;rows.forEach((r,i)=>{r.inc=Math.round(r1*Math.pow(1+g,i))});draw();run()};
-$("ex").onclick=()=>{$("py").value=2015;$("ey").value=2025;$("price").value=8000000;$("extra").value=600000;$("exitv").value=15000000;$("ln").checked=true;$("lnf").hidden=false;$("L").value=5000000;$("term").value=20;$("r1").value=240000;$("gr").value=5;rows=[];sync();rows.forEach((r,i)=>{r.inc=Math.round(240000*Math.pow(1.05,i));r.exp=Math.round(r.inc*.15)});draw();run()};
-$("rs").onclick=()=>{document.querySelectorAll("input").forEach(i=>{if(i.type=="checkbox")i.checked=false;else if(i.id!="cc")i.value=""});$("lnf").hidden=true;rateEdited=false;rows=[];sync();load()};
-async function init(){let list=[["IND","India","IN"],["USA","United States","US"],["GBR","United Kingdom","GB"],["ARE","United Arab Emirates","AE"],["AUS","Australia","AU"],["SGP","Singapore","SG"],["DEU","Germany","DE"]];
-try{const r=await fetch(BASE+"country?format=json&per_page=400"),j=await r.json();const l=j[1].filter(c=>c.region&&c.region.value!="Aggregates").map(c=>[c.id,c.name,c.iso2Code]).sort((a,b)=>a[1].localeCompare(b[1]));if(l.length>50)list=l}catch(e){}
-list.forEach(c=>iso2[c[0]]=c[2]);$("cty").innerHTML=list.map(c=>`<option value="${c[0]}">${c[1]}</option>`).join("");
-$("cty").value="IND";$("cc").value="INR";sync();load()}
-init();
+const d0=p.d0,dts=cfL.map((_,t)=>Date.UTC(d0.getUTCFullYear()+t,d0.getUTCMonth(),d0.getUTCDate()));
+const iU=irr(cfU),iL=irr(cfL),r1=rows[0],em=sum(cfL.slice(1))/eq;
+const alt={};[["FD",p.fd,1],["Bonds",p.bond,1],["Equity mutual fund",p.mf,0]].forEach(([n,r,ti])=>{const rn=ti?r*(1-tx):r*(1-p.ltcg*1.04/100),f=1+rn/100;
+const B=cfL.reduce((a,c,t)=>a+(-(t==N?c-(sale-cg-bN):c))*Math.pow(f,N-t),0),W=sale-cg-bN;alt[n]={rn,B,W,nfv:W-B}});
+return{rows,cfU,cfL,val,bal,D,iU,iL,xU:xirr(cfU,dts),xL:xirr(cfL,dts),rU:irr(re(cfU)),rL:irr(re(cfL)),g,exit,sale,cg,cgr,gain,up,eq,L,emi:S.emi,buy,em,cagrEq:cagr(1,em,N),
+gy:p.rent*12/P,ny:r1.noi/P,coc:r1.cf/eq,dscr:r1.e?r1.noi/r1.e:NaN,net:sum(cfL),netU:sum(cfU),realNet:sum(re(cfL)),inv:-sum(cfL.filter(c=>c<0)),alt,totInt:sum(rows.map(r=>r.i))}}
+function selfTest(){const T=[],ok=(n,c,d)=>T.push([n,!!c,d||""]),cl=(a,b,e)=>Math.abs(a-b)<=e;
+ok("EMI of 10,00,000 at 12% for 12 months is 88,848.79",cl(pmt(1e6,.01,12),88848.79,.01),pmt(1e6,.01,12).toFixed(2));
+ok("IRR of -100 then 110 is 10%",cl(irr([-100,110]),.1,1e-9));
+const a=Date.UTC(2020,0,1),b=Date.UTC(2021,0,1);ok("XIRR over 366 days uses day count",cl(xirr([-1000,1100],[a,b]),Math.pow(1.1,365/366)-1,1e-9),xirr([-1000,1100],[a,b]).toFixed(6));
+ok("CAGR of 100 to 200 over 10 years",cl(cagr(100,200,10),Math.pow(2,.1)-1,1e-12));
+const S=sched(1e6,9,20,240);ok("Loan fully repaid at term end",cl(S.Y[19].b,0,.01));
+ok("Principal repaid equals loan",cl(S.Y.reduce((x,y)=>x+y.p,0),1e6,.01));
+ok("Interest plus principal equals EMI times months",cl(S.Y.reduce((x,y)=>x+y.e,0),S.emi*240,.05));
+const f=.05,cf=[-100,0,0,133.1];ok("Real IRR equals (1+i)/(1+f)-1 for flat inflation",cl(irr(cf.map((c,t)=>c/Math.pow(1+f,t))),1.1/1.05-1,1e-9));
+const mk=o=>calc({price:100,d0:new Date(Date.UTC(2020,0,1)),N:5,reno:0,stamp:0,reg:0,brok:0,sbrok:0,rent:0,rg:0,vac:0,maint:0,opex:0,ptax:0,app:0,exitv:0,ltv:0,rate:9,term:20,slab:30,ltcg:12.5,fd:7,bond:7,mf:12,inf:[0,0,0,0,0],...o});
+ok("No income and no growth gives 0% IRR",cl(mk({}).iU,0,1e-9));
+ok("6% growth for 5 years gives 6% IRR",cl(mk({app:6,ltcg:0,slab:0}).iU,.06,1e-9));
+const c=mk({stamp:5,reg:1,brok:1,ltv:60});ok("Equity at start is price plus costs minus loan",cl(c.eq,107-60,1e-9),c.eq.toFixed(2));
+ok("Without a loan levered and unlevered IRR match",cl(mk({app:4}).iL,mk({app:4}).iU,1e-12));
+const d=mk({rent:1000,vac:10,opex:10,rg:0,slab:0,ltcg:0});ok("Net income is rent less vacancy and operating costs",cl(d.rows[0].noi,12000*.9*.9,1e-9),d.rows[0].noi.toFixed(2));
+const e=mk({rent:1000,slab:30,ltcg:0});ok("Rental tax is 30% standard deduction then slab and cess",cl(e.rows[0].tax,12000*.7*.3*1.04,1e-9),e.rows[0].tax.toFixed(2));
+const h=mk({app:10});ok("Long-term gain tax uses 12.5% plus 4% cess",cl(h.cg,(h.sale-100)*.125*1.04,1e-9));
+return T}
+//ENDENGINE
+const $=id=>document.getElementById(id);
+const F=[["Property and purchase",[["price","Purchase price (₹)",8000000],["date0","Purchase date",""],["N","Holding period (years)",10],["reno","Renovation and other upfront cost (₹)",0],["stamp","Stamp duty (% of price, varies by state)",5],["reg","Registration (% of price)",1],["brok","Brokerage at purchase (%)",1]]],
+["Income and running costs",[["rent","Monthly rent, year 1 (₹)",30000],["rg","Rent growth per year (%)",5],["vac","Vacancy (% of rent lost)",8],["maint","Society maintenance, monthly (₹)",2500],["opex","Repairs and management (% of rent)",5],["ptax","Property tax (% of value a year)",.15]]],
+["Appreciation and sale",[["app","Price appreciation per year (%)",6],["exitv","Actual or expected sale value (₹), overrides appreciation",0],["sbrok","Selling cost: brokerage and fees (%)",1]]],
+["Home loan",[["ltv","Loan-to-value (%, 0 for none)",60],["rate","Interest rate (% a year)",9],["term","Loan term (years)",20]]],
+["Tax, India",[["slab","Income tax slab rate (%)",30],["ltcg","Long-term capital gains rate (%)",12.5]]],
+["Alternatives, pre-tax return (% a year)",[["fd","Bank fixed deposit",7],["bond","Bonds",7.5],["mf","Equity mutual fund",12]]],
+["Inflation",[["infA","Assumed inflation where World Bank has no figure (%)",5]]]];
+$("inp").innerHTML=F.map(([g,fs])=>`<fieldset><legend>${g}</legend>${fs.map(([i,l,d])=>`<label for="${i}">${l}<span class="tag">${i=="infA"?"Estimate":"Assumption"}</span></label><input id="${i}" ${i=="date0"?'type="date"':'type="number" inputmode="decimal" step="any"'} value="${d}">${i=="rate"?'<div class="hint" id="hR"></div>':i=="fd"?'<div class="hint" id="hF"></div>':i=="infA"?'<div class="hint" id="hI"></div>':""}`).join("")}</fieldset>`).join("");
+$("date0").value=new Date().toISOString().slice(0,10);
+const fmt=x=>(x<0?"-":"")+"₹"+Math.abs(Math.round(x)).toLocaleString("en-IN"),pc=x=>isFinite(x)?(x*100).toFixed(2)+"%":"n/a",num=id=>parseFloat($(id).value);
+const FB={IND:{inf:{1990:8.97,1991:13.87,1992:11.79,1993:6.33,1994:10.25,1995:10.22,1996:8.98,1997:7.16,1998:13.23,1999:4.67,2000:4.01,2001:3.78,2002:4.30,2003:3.81,2004:3.77,2005:4.25,2006:5.80,2007:6.37,2008:8.35,2009:10.88,2010:11.99,2011:8.91,2012:9.48,2013:10.02,2014:6.67,2015:4.91,2016:4.95,2017:3.33,2018:3.94,2019:3.73,2020:6.62,2021:5.13,2022:6.70,2023:5.65,2024:4.95,2025:2.40},lend:{},dep:{}}};
+const WBU="https://api.worldbank.org/v2/",IND={inf:"FP.CPI.TOTL.ZG",lend:"FR.INR.LEND",dep:"FR.INR.DPST"},YR=new Date().getFullYear();
+let W={inf:{},lend:{},dep:{},src:"none",t:0},iso2={},LAST=null;
+const ls=(k,v)=>{try{if(v===undefined)return JSON.parse(localStorage.getItem(k));localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}};
+const st=(t,c)=>{$("st").textContent=t;$("st").className=c||""};
+const latest=o=>{const k=Object.keys(o||{}).map(Number).sort((a,b)=>b-a)[0];return k?[k,o[k]]:null};
+async function one(c,i){const r=await fetch(`${WBU}country/${c}/indicator/${IND[i]}?format=json&per_page=200&date=1990:${YR}`);if(!r.ok)throw 0;const j=await r.json(),o={};(j[1]||[]).forEach(d=>{if(d.value!=null)o[+d.date]=+(+d.value).toFixed(3)});return o}
+async function load(){const c=$("cty").value;st("Loading World Bank data…");let ok=false;
+try{const [a,l,d]=await Promise.all([one(c,"inf"),one(c,"lend").catch(()=>({})),one(c,"dep").catch(()=>({}))]);W={inf:a,lend:l,dep:d,src:"live",t:Date.now()};const k=ls("wbc")||{};k[c]={inf:a,lend:l,dep:d,t:W.t};ls("wbc",k);ok=true}
+catch(e){const k=(ls("wbc")||{})[c]||(ls("wbAll")&&ls("wbAll").d[c]);if(k)W={inf:k.inf||{},lend:k.lend||{},dep:k.dep||{},src:"saved",t:k.t||(ls("wbAll")||{}).t};else if(FB[c])W={...FB[c],src:"built-in",t:0};else W={inf:{},lend:{},dep:{},src:"none",t:0}}
+const li=latest(W.inf),ll=latest(W.lend),ld=latest(W.dep),dt=W.t?new Date(W.t).toLocaleDateString():"";
+const first=Object.keys(W.inf).map(Number).sort((a,b)=>a-b)[0];
+st(li?`Actual World Bank inflation ${first} to ${li[0]} (${W.src}${dt?", "+dt:""}). Years after ${li[0]} use your assumed rate.`:"No World Bank inflation for this country or connection failed. Enter an assumed inflation rate; every year will be marked Estimate.",li?(ok?"ok":""):"err");
+const rec=Object.keys(W.inf).map(Number).sort((a,b)=>b-a).slice(0,5).map(y=>W.inf[y]);if(rec.length)$("infA").value=(rec.reduce((a,b)=>a+b,0)/rec.length).toFixed(2);
+$("hI").textContent=rec.length?`Default is the average of the last ${rec.length} World Bank years.`:"";
+$("hR").textContent=ll?`Actual: World Bank lending rate ${ll[1].toFixed(2)}% (${ll[0]}). A reference only, use your lender's rate.`:"";
+$("hF").textContent=ld?`Actual: World Bank deposit rate ${ld[1].toFixed(2)}% (${ld[0]}). A reference only.`:"";
+run()}
+async function saveAll(){st("Downloading all countries, this may take a minute…");try{const o={};for(const i in IND){const r=await fetch(`${WBU}country/all/indicator/${IND[i]}?format=json&per_page=20000&date=1990:${YR}`),j=await r.json();(j[1]||[]).forEach(d=>{if(d.value!=null&&d.countryiso3code){o[d.countryiso3code]=o[d.countryiso3code]||{};(o[d.countryiso3code][i]=o[d.countryiso3code][i]||{})[+d.date]=+(+d.value).toFixed(3)}})}
+ls("wbAll",{t:Date.now(),d:o});st(`Saved data for ${Object.keys(o).length} countries on this device. They now work offline.`,"ok")}catch(e){st("Could not download or save. Check your connection and storage, then try again.","err")}}
+function read(){const p={},er=[];F.forEach(([g,fs])=>fs.forEach(([i])=>{p[i]=i=="date0"?$(i).value:num(i)}));
+const chk=(c,m)=>{if(!c)er.push(m)};
+chk(p.price>0,"Purchase price must be above zero.");chk(Number.isInteger(p.N)&&p.N>=1&&p.N<=40,"Holding period must be a whole number from 1 to 40 years.");
+chk(/^\d{4}-\d\d-\d\d$/.test(p.date0),"Enter the purchase date.");
+["reno","stamp","reg","brok","sbrok","rent","rg","vac","maint","opex","ptax","exitv","ltv","rate","slab","ltcg","fd","bond","mf","infA"].forEach(k=>chk(isFinite(p[k]),"Fill every field. Use 0 where nothing applies. Missing: "+k));
+chk(p.vac>=0&&p.vac<=100,"Vacancy must be 0 to 100%.");chk(p.ltv>=0&&p.ltv<=95,"Loan-to-value must be 0 to 95%.");chk(p.slab>=0&&p.slab<=45,"Tax slab must be 0 to 45%.");
+if(p.ltv>0)chk(p.term>=1&&p.rate>=0,"Loan needs a term of at least 1 year and a rate of 0 or more.");
+if(!er.length){p.d0=new Date(p.date0+"T00:00:00Z");chk(!isNaN(p.d0),"Purchase date is not valid.");
+p.inf=[];p.src=[];for(let t=1;t<=p.N;t++){const y=p.d0.getUTCFullYear()+t;if(W.inf[y]!=null){p.inf.push(W.inf[y]);p.src.push("Actual")}else{p.inf.push(p.infA);p.src.push("Estimate")}}}
+return{p,er}}
+const T=(h,r,cls)=>`<div class="sc"><table><tr>${h.map(x=>`<th>${x}</th>`).join("")}</tr>${r.map(x=>`<tr>${x.map((c,i)=>Array.isArray(c)?`<td class="${c[1]}">${c[0]}</td>`:`<td${cls&&cls[i]?` class="${cls[i]}"`:""}>${c}</td>`).join("")}</tr>`).join("")}</table></div>`;
+function chart(v,b){const e=v.map((x,i)=>x-b[i]),W=600,H=220,m=8,N=v.length-1,mx=Math.max(...v)*1.05,mn=Math.min(0,...e),X=i=>m+i*(W-2*m)/N,Y=x=>H-22-(x-mn)/(mx-mn)*(H-40),pl=(a,c)=>`<polyline fill="none" stroke="${c}" stroke-width="2.5" points="${a.map((x,i)=>X(i).toFixed(1)+","+Y(x).toFixed(1)).join(" ")}"/>`;
+return`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Property value, loan balance and equity by year">${pl(v,"var(--g)")}${pl(b,"var(--neg)")}${pl(e,"var(--gold)")}<text x="${m}" y="12" font-size="11" fill="currentColor">${fmt(mx)}</text><text x="${m}" y="${H-5}" font-size="11" fill="currentColor">Year 0 to ${N}</text></svg><p class="hint">Green: property value. Red: loan balance. Gold: your equity.</p>`}
+function run(){const{p,er}=read();$("err").innerHTML=er.map(m=>`<div class="note bad">${m}</div>`).join("");if(er.length){$("out").innerHTML="";$("btns").hidden=true;return}
+const R=calc(p),loan=p.ltv>0,notes=[];LAST={p,R};
+if(R.cg>0)notes.push(["",`Capital gains tax at sale is ${fmt(R.cg)} (${(R.cgr*100).toFixed(2)}% on a gain of ${fmt(R.gain)}).`]);
+if(loan&&R.iU<p.rate/100)notes.push(["bad",`The loan costs ${p.rate}% but the property earns ${pc(R.iU)} before the loan, so borrowing lowers your return.`]);
+if(loan&&isFinite(R.dscr)&&R.dscr<1.2)notes.push(["bad",`Year 1 income covers loan payments only ${R.dscr.toFixed(2)} times. Lenders usually want 1.2 or more.`]);
+if(R.rows[0].cf<0)notes.push(["",`Year 1 cash flow is ${fmt(R.rows[0].cf)}. You fund the shortfall yourself.`]);
+if(isNaN(R.iL))notes.push(["bad","IRR could not be found because the cash flows never change sign."]);
+const est=p.src.filter(s=>s=="Estimate").length;if(est)notes.push(["",`${est} of ${p.N} inflation years are estimates, not published data.`]);
+const K=loan?R.iL:R.iU,X=loan?R.xL:R.xU,RR=loan?R.rL:R.rU;
+let h=`<div class="hero"><div><small>Return on your cash (IRR)</small><div class="big">${pc(K)}</div><small>${pc(RR)} after inflation</small></div><div><small>XIRR using exact dates</small><div class="big">${pc(X)}</div><small>Estimate from your assumptions</small></div><div><small>Property value CAGR</small><div class="big">${pc(R.g)}</div><small>Equity multiple ${R.em.toFixed(2)}x</small></div></div>
+<div class="grid">${[["Cash you invest",fmt(R.inv)],["Purchase costs (stamp, registration, brokerage)",fmt(R.buy)],["IRR without a loan",pc(R.iU)],["Real IRR without a loan",pc(R.rU)],["Gross rental yield",pc(R.gy)],["Net yield after costs, year 1",pc(R.ny)],["Cash-on-cash, year 1",pc(R.coc)],["Debt service cover, year 1",isFinite(R.dscr)?R.dscr.toFixed(2):"no loan"],["Monthly EMI",fmt(R.emi)],["Total interest paid",fmt(R.totInt)],["Sale value, year "+p.N,fmt(R.exit)],["Net gain, nominal",fmt(R.net)],["Net gain, in today's money",fmt(R.realNet)]].map(([a,b])=>`<div class="m"><span>${a}</span><b>${b}</b></div>`).join("")}</div>${notes.map(([c,t])=>`<div class="note ${c}">${t}</div>`).join("")}`;
+h+=`<h2>Value, loan and equity</h2>${chart(R.val,R.bal)}`;
+h+=`<h2>Annual cash-flow statement</h2>`+T(["Year","Inflation","Basis","Rent after vacancy","Maintenance","Repairs and mgmt","Property tax","Net operating income","Income tax","EMI interest","EMI principal","Cash after loan","Loan balance","Property value"],R.rows.map((r,i)=>[r.t,p.inf[i].toFixed(2)+"%",p.src[i],fmt(r.eff),fmt(-r.mt),fmt(-r.ox),fmt(-r.pt),fmt(r.noi),fmt(-r.tax),fmt(-r.i),fmt(-r.p),fmt(r.cf),fmt(r.bal),fmt(r.v)]));
+h+=`<p class="hint">Year 0: you pay ${fmt(R.eq)} (price, costs and renovation less the loan). Year ${p.N}: sale proceeds after selling costs and capital gains tax ${fmt(R.sale-R.cg)}, less loan balance ${fmt(R.bal)}.</p>`;
+h+=`<h2>Property against fixed deposits, bonds and mutual funds</h2><p class="hint">Equivalent cash flows: the same payments you make for the property go into the alternative, which pays the same interim income. "Alternative ends with" is that account's balance in year ${p.N}. After-tax rates use your slab for FDs and bonds and the capital gains rate for funds.</p>`+T(["Alternative","Pre-tax","After tax","Alternative ends with","Property ends with","Property ahead by","Winner"],Object.entries(R.alt).map(([n,a])=>[n,{FD:p.fd,Bonds:p.bond,"Equity mutual fund":p.mf}[n]+"%",a.rn.toFixed(2)+"%",fmt(a.B),fmt(a.W),fmt(a.nfv),a.nfv>=0?"Property":n]),null);
+const da=[-3,-1.5,0,1.5,3],dr=[-2,-1,0,1,2],best=Math.max(R.alt.FD.rn,R.alt.Bonds.rn)/100;
+h+=`<h2>Sensitivity: IRR on your cash</h2><p class="hint">Price growth down the side, loan rate across. Green beats ${(best*100).toFixed(1)}% (the better after-tax FD or bond), amber is positive but lower, red is negative. Outlined cell is your base case. Price growth is ignored if you entered a sale value.</p>`+T(["Growth \\ Rate",...dr.map(x=>(p.rate+x).toFixed(1)+"%")],da.map(a=>[(p.app+a).toFixed(1)+"%",...dr.map(r=>{const v=calc({...p,app:p.app+a,rate:p.rate+r}).iL;return[pc(v),(!(v>=0)?"n":v<best?"w":"p")+(a==0&&r==0?" c":"")]})]),null);
+const sc=[["Bear",-3,-2,5],["Base",0,0,0],["Bull",3,2,-3]].map(([n,a,g,v])=>{const q=calc({...p,app:p.app+a,rg:p.rg+g,vac:Math.min(100,Math.max(0,p.vac+v)),exitv:p.exitv>0?p.exitv*Math.pow(1+a/100,p.N):0});return[n,(p.app+a).toFixed(1)+"%",(p.rg+g).toFixed(1)+"%",Math.min(100,Math.max(0,p.vac+v)).toFixed(0)+"%",pc(q.iL),pc(q.rL),fmt(q.net),fmt(q.alt.FD.nfv)]});
+h+=`<h2>Investment scenarios</h2>`+T(["Scenario","Price growth","Rent growth","Vacancy","IRR","Real IRR","Net gain","Ahead of FD by"],sc);
+$("out").innerHTML=h;$("btns").hidden=false}
+function xls(){const o=$("out").innerHTML.replace(/<svg[\s\S]*?<\/svg>/g,"").replace(/<div class="sc">|<\/div>/g,"");const b=new Blob([`<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body><h2>Property investment analysis</h2>${o}</body></html>`],{type:"application/vnd.ms-excel"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="property-analysis.xls";document.body.appendChild(a);a.click();a.remove()}
+document.addEventListener("input",e=>{if(e.target.closest("#inp"))run()});
+$("cty").onchange=load;$("retry").onclick=load;$("sv").onclick=saveAll;$("pdf").onclick=()=>window.print();$("xls").onclick=xls;
+$("tests").onclick=()=>{const t=selfTest(),p=t.filter(x=>x[1]).length;$("tr").innerHTML=`<div class="note ${p==t.length?"ok":"bad"}"><b>${p} of ${t.length} formula tests passed</b><br>${t.map(x=>(x[1]?"Pass: ":"FAIL: ")+x[0]+(x[2]?" ("+x[2]+")":"")).join("<br>")}</div>`};
+(async()=>{let list=ls("wbList")||[["IND","India","IN"],["USA","United States","US"],["GBR","United Kingdom","GB"],["ARE","United Arab Emirates","AE"],["AUS","Australia","AU"],["SGP","Singapore","SG"],["DEU","Germany","DE"]];
+try{const j=await(await fetch(WBU+"country?format=json&per_page=400")).json(),l=j[1].filter(c=>c.region&&c.region.value!="Aggregates").map(c=>[c.id,c.name,c.iso2Code]).sort((a,b)=>a[1].localeCompare(b[1]));if(l.length>50){list=l;ls("wbList",l)}}catch(e){}
+$("cty").innerHTML=list.map(c=>`<option value="${c[0]}">${c[1]}</option>`).join("");$("cty").value="IND";load()})();
 </script>
 </body>
 </html>
