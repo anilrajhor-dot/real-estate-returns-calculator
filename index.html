@@ -44,7 +44,7 @@ footer{color:var(--mut);font-size:.8rem;margin:20px 0}a{color:var(--g)}
 <h1>Property returns calculator</h1>
 <p class="hint">Pick a country. Inflation, lending rates and deposit rates load from the World Bank, year by year.</p>
 <div id="st">Loading World Bank data…</div>
-<button id="retry" class="g" type="button" hidden>Retry World Bank</button><button id="ex" type="button">Load example</button><button class="g" id="rs" type="button">Reset</button>
+<button id="retry" class="g" type="button" hidden>Retry World Bank</button><button id="sv" class="g" type="button">Save all countries offline</button><button id="ex" type="button">Load example</button><button class="g" id="rs" type="button">Reset</button>
 
 <section><h2>1. Property and purchase</h2>
 <label for="cty">Country</label><select id="cty"></select>
@@ -81,12 +81,16 @@ footer{color:var(--mut);font-size:.8rem;margin:20px 0}a{color:var(--g)}
 const $=id=>document.getElementById(id);
 const CUR={IN:"INR",US:"USD",GB:"GBP",AE:"AED",AU:"AUD",SG:"SGD",CA:"CAD",JP:"JPY",CN:"CNY",SA:"SAR",ZA:"ZAR",NZ:"NZD",CH:"CHF",BR:"BRL",MX:"MXN",ID:"IDR",MY:"MYR",TH:"THB",PK:"PKR",BD:"BDT",LK:"LKR",NP:"NPR",KE:"KES",NG:"NGN",DE:"EUR",FR:"EUR",IT:"EUR",ES:"EUR",NL:"EUR",IE:"EUR",PT:"EUR"};
 const BASE="https://api.worldbank.org/v2/";
+const FB={IND:{1990:8.97,1991:13.87,1992:11.79,1993:6.33,1994:10.25,1995:10.22,1996:8.98,1997:7.16,1998:13.23,1999:4.67,2000:4.01,2001:3.78,2002:4.30,2003:3.81,2004:3.77,2005:4.25,2006:5.80,2007:6.37,2008:8.35,2009:10.88,2010:11.99,2011:8.91,2012:9.48,2013:10.02,2014:6.67,2015:4.91,2016:4.95,2017:3.33,2018:3.94,2019:3.73,2020:6.62,2021:5.13,2022:6.70,2023:5.65,2024:4.95,2025:2.40}};
 let rows=[],W={inf:{},lend:{},dep:{}},iso2={},rateEdited=false;
 const mo=x=>{const c=$("cc").value.trim().toUpperCase(),v=Math.round(x);try{return new Intl.NumberFormat(undefined,c.length==3?{style:"currency",currency:c,maximumFractionDigits:0}:{maximumFractionDigits:0}).format(v)}catch(e){return v.toLocaleString()}};
 const pc=x=>isFinite(x)?(x*100).toFixed(1)+"%":"n/a";
 const num=id=>parseFloat($(id).value)||0;
 const st=(t,c)=>{$("st").textContent=t;$("st").className=c||"";$("retry").hidden=c!="err"};
 async function wb(c,ind){const r=await fetch(`${BASE}country/${c}/indicator/${ind}?format=json&per_page=200&date=1990:${new Date().getFullYear()}`);if(!r.ok)throw 0;const j=await r.json(),o={};(j[1]||[]).forEach(d=>{if(d.value!=null)o[+d.date]=d.value});return o}
+async function bulk(ind){const r=await fetch(`${BASE}country/all/indicator/${ind}?format=json&per_page=20000&date=1990:${new Date().getFullYear()}`);if(!r.ok)throw 0;const j=await r.json(),o={};(j[1]||[]).forEach(d=>{if(d.value!=null&&d.countryiso3code)(o[d.countryiso3code]=o[d.countryiso3code]||{})[+d.date]=+(+d.value).toFixed(3)});return o}
+function getCache(){try{return JSON.parse(localStorage.getItem("wbcache"))}catch(e){return null}}
+async function cacheAll(){try{const [inf,lend,dep]=await Promise.all([bulk("FP.CPI.TOTL.ZG"),bulk("FR.INR.LEND").catch(()=>({})),bulk("FR.INR.DPST").catch(()=>({}))]);localStorage.setItem("wbcache",JSON.stringify({t:Date.now(),inf,lend,dep}));return Object.keys(inf).length}catch(e){return 0}}
 const latest=o=>{const k=Object.keys(o).map(Number).sort((a,b)=>b-a)[0];return k?[k,o[k]]:null};
 async function load(){const c=$("cty").value;st("Loading World Bank data…");
 try{const [a,b,d]=await Promise.all([wb(c,"FP.CPI.TOTL.ZG"),wb(c,"FR.INR.LEND").catch(()=>({})),wb(c,"FR.INR.DPST").catch(()=>({}))]);W={inf:a,lend:b,dep:d};
@@ -95,7 +99,9 @@ if(li)$("inf").value=li[1].toFixed(2);
 if(ll&&!rateEdited)$("rate").value=ll[1].toFixed(2);
 $("rh").textContent=ll?`World Bank lending rate: ${ll[1].toFixed(2)}% (${ll[0]}). Edit to match your loan.`:"No World Bank lending rate for this country. Enter your loan rate.";
 st(li?`World Bank loaded. Latest inflation: ${li[1].toFixed(2)}% (${li[0]}).`:"No World Bank inflation data for this country. Enter inflation by year.",li?"ok":"err");
-}catch(e){st("Could not reach the World Bank. Open this file from your own website or browser, check your connection, then retry. You can still type inflation by year.","err")}
+const k0=getCache();if(!k0||Date.now()-k0.t>2592e6)cacheAll();
+}catch(e){const k=getCache(),s=k&&k.inf[c]?k:null;W={inf:s?s.inf[c]:(FB[c]||{}),lend:(s&&s.lend[c])||{},dep:(s&&s.dep[c])||{}};const li=latest(W.inf),ll=latest(W.lend);if(li)$("inf").value=li[1].toFixed(2);if(ll&&!rateEdited)$("rate").value=ll[1].toFixed(2);
+st(li?`Offline: using ${s?"data saved on "+new Date(s.t).toLocaleDateString():"built-in India data"} for ${$("cty").selectedOptions[0].text}, up to ${li[0]}. Retry for live data.`:"Could not reach the World Bank and no saved data exists for this country. Open this file from your own website or browser, connect once to save data, or type inflation by year.","err")}
 applyWB();run()}
 function applyWB(){const ks=Object.keys(W.inf).map(Number).sort((a,b)=>a-b);rows.forEach((r,i)=>{if(i==0||r.src=="user")return;if(W.inf[r.y]!=null){r.inf=W.inf[r.y];r.src="wb"}else{const p=ks.filter(k=>k<r.y).pop();r.inf=p!=null?W.inf[p]:num("inf");r.src=p!=null?"carried":"fallback"}});draw()}
 function years(){const py=Math.round(num("py")),ey=Math.round(num("ey"));return py>1900&&ey>py&&ey-py<=50?[py,ey]:null}
@@ -129,6 +135,7 @@ document.addEventListener("input",e=>{const t=e.target;if(t.dataset.k){const r=r
 $("ln").onchange=()=>{$("lnf").hidden=!$("ln").checked;run()};
 $("cty").onchange=()=>{$("cc").value=CUR[iso2[$("cty").value]]||"";rows.forEach(r=>{if(r.src!="user")r.src=""});load()};
 $("retry").onclick=load;
+$("sv").onclick=async()=>{st("Downloading data for all countries…");const n=await cacheAll();st(n?`Saved inflation data for ${n} countries and regions on this device. They now work offline.`:"Could not download or save. Check your connection and try again.",n?"ok":"err")};
 $("fill").onclick=()=>{if(!rows.length)return;const r1=num("r1"),g=num("gr")/100;rows.forEach((r,i)=>{r.inc=Math.round(r1*Math.pow(1+g,i))});draw();run()};
 $("ex").onclick=()=>{$("py").value=2015;$("ey").value=2025;$("price").value=8000000;$("extra").value=600000;$("exitv").value=15000000;$("ln").checked=true;$("lnf").hidden=false;$("L").value=5000000;$("term").value=20;$("r1").value=240000;$("gr").value=5;rows=[];sync();rows.forEach((r,i)=>{r.inc=Math.round(240000*Math.pow(1.05,i));r.exp=Math.round(r.inc*.15)});draw();run()};
 $("rs").onclick=()=>{document.querySelectorAll("input").forEach(i=>{if(i.type=="checkbox")i.checked=false;else if(i.id!="cc")i.value=""});$("lnf").hidden=true;rateEdited=false;rows=[];sync();load()};
