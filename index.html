@@ -36,7 +36,8 @@ td.p{background:rgba(31,122,77,.2)}td.n{background:rgba(166,58,46,.2)}td.w{backg
 .note{background:var(--card);border-left:4px solid var(--gold);border-radius:6px;padding:8px 12px;margin:8px 0;font-size:.9rem}
 .note.bad{border-color:var(--neg)}.note.ok{border-color:var(--pos)}
 .tag{font-size:.7rem;font-weight:600;border-radius:4px;padding:0 5px;margin-left:5px;border:1px solid var(--line);color:var(--mut)}
-.LIVE{color:var(--pos);font-weight:700}.CACHED{color:var(--gold);font-weight:700}.ESTIMATED{color:var(--mut);font-weight:700}.USER-EDITED{color:var(--g);font-weight:700}.ND{color:var(--neg);font-weight:700}
+.MANUAL{color:var(--g);font-weight:700}.UNAVAILABLE{color:var(--neg);font-weight:700}.LIVE{color:var(--pos);font-weight:700}.CACHED{color:var(--gold);font-weight:700}.ESTIMATED{color:var(--mut);font-weight:700}.USER-EDITED{color:var(--g);font-weight:700}.ND{color:var(--neg);font-weight:700}
+.r2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0;align-items:center}
 footer{color:var(--mut);font-size:.78rem;margin:20px 0}
 @media print{body{background:#fff}button,#inp,#st{display:none}.w{max-width:none}}
 </style>
@@ -52,11 +53,36 @@ footer{color:var(--mut);font-size:.78rem;margin:20px 0}
 <div id="inp" class="f" style="margin-top:12px"></div>
 <div id="err"></div>
 <div id="out" aria-live="polite"></div>
+<div id="ma"></div>
 <div id="btns" hidden><button id="pdf" type="button">Save as PDF</button><button class="g" id="xls" type="button">Download Excel (.xlsx)</button></div>
 <footer>Indicative estimates, not investment, tax or legal advice. Tax model is simplified for resident individuals in India: rental income after 30% standard deduction and loan interest at slab rate plus 4% cess, with losses not set off; capital gains without indexation (long term if held over 24 months), plus 4% cess. Rules and state stamp duty change, so confirm with a qualified adviser. World Bank: FP.CPI.TOTL.ZG inflation, FR.INR.LEND lending rate, FR.INR.DPST deposit rate.</footer>
 </div>
 <script>
 //ENGINE
+const pd=s=>{s=String(s).trim().replace(/^"|"$/g,"");let m;
+if(m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))return Date.UTC(+m[1],m[2]-1,+m[3]);
+if(m=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/))return Date.UTC(+m[3],m[2]-1,+m[1]);
+if(m=s.match(/^(\d{1,2})[-\/ ]([A-Za-z]{3})[A-Za-z]*[-\/ ,]+(\d{4})/)){const i="jan feb mar apr may jun jul aug sep oct nov dec".split(" ").indexOf(m[2].toLowerCase());return i<0?NaN:Date.UTC(+m[3],i,+m[1])}
+return NaN};
+function parseCSV(x){const L=x.replace(/^\uFEFF/,"").split(/\r?\n/).map(l=>l.replace(/"([^"]*)"/g,(m,a)=>a.replace(/,/g,""))).filter(l=>l.trim());if(!L.length)return{rows:[],bad:0};
+const d=L[0].includes("\t")?"\t":L[0].split(";").length>L[0].split(",").length?";":",",h=L[0].split(d);let pc=-1,dc=-1,st=0,bad=0;
+if(isNaN(pd(h[0]))){st=1;h.forEach((n,i)=>{if(i>0&&pc<0&&/close|price|nav|value/i.test(n)&&!/open|high|low/i.test(n))pc=i;if(/div|distribution|payout/i.test(n))dc=i})}
+if(pc<0)pc=1;const m=new Map();
+L.slice(st).forEach(l=>{const c=l.split(d),t=pd(c[0]),p=parseFloat(String(c[pc]).replace(/[^0-9.\-eE]/g,"")),v=dc>=0?parseFloat(String(c[dc]).replace(/[^0-9.\-eE]/g,"")):0;if(!isNaN(t)&&p>0)m.set(t,[t,p,v>0?v:0]);else bad++});
+return{rows:[...m.values()].sort((a,b)=>a[0]-b[0]),bad}}
+function defl(t0,t1,f){let D=1;for(let y=new Date(t0).getUTCFullYear();y<=new Date(t1).getUTCFullYear();y++){const a=Math.max(t0,Date.UTC(y,0,1)),b=Math.min(t1,Date.UTC(y+1,0,1));if(b>a)D*=Math.pow(1+f(y)/100,(b-a)/864e5/365)}return D}
+function stats(R,t0,t1,o){const tol=10*864e5;let i0=R.findIndex(r=>r[0]>=t0),i1=-1;for(let i=R.length-1;i>=0;i--)if(R[i][0]<=t1){i1=i;break}
+if(i0<0||i1<=i0||R[i0][0]-t0>tol||t1-R[i1][0]>tol)return{err:"Data does not cover this period"};
+const d0=R[i0][0],d1=R[i1][0],days=(d1-d0)/864e5,yrs=days/365,tx=o.slab*1.04/100,p0=R[i0][1],p1=R[i1][1];
+const sim=dt=>{let u=o.amt*(1-o.cin/100)/p0,ri=0;const fl=[-o.amt],dd=[d0];for(let i=i0+1;i<=i1;i++){const dv=R[i][2];if(dv>0){const c=dv*u*(1-dt);if(o.reinv){u+=c/R[i][1];ri+=c}else{fl.push(c);dd.push(R[i][0])}}}
+return{fl,dd,ri,g:u*p1*(1-o.cout/100)}};
+const A=sim(0),B=sim(tx),rate=(o.cls=="eq"?(days>365?o.lteq:o.steq):o.cls=="gold"?(days>730?o.ltoth:o.slab):o.slab)*1.04/100,tax=Math.max(0,B.g-o.amt-B.ri)*rate;
+const xa=xirr([...A.fl,A.g],[...A.dd,d1]),xb=xirr([...B.fl,B.g-tax],[...B.dd,d1]);
+const m=[];let last="";for(let i=i0;i<=i1;i++){const k=new Date(R[i][0]).toISOString().slice(0,7);if(k==last)m[m.length-1]=R[i][1];else{m.push(R[i][1]);last=k}}
+const rr=m.slice(1).map((x,i)=>x/m[i]-1),mu=rr.reduce((a,b)=>a+b,0)/rr.length,vol=rr.length>=12?Math.sqrt(rr.reduce((a,b)=>a+(b-mu)**2,0)/(rr.length-1))*Math.sqrt(12):NaN;
+let pk=0,mdd=0,mg=0;for(let i=i0;i<=i1;i++){pk=Math.max(pk,R[i][1]);mdd=Math.max(mdd,(pk-R[i][1])/pk);if(i>i0)mg=Math.max(mg,(R[i][0]-R[i-1][0])/864e5)}
+return{d0,d1,yrs,final:A.g,afterFinal:B.g-tax,pc:cagr(p0,p1,yrs),xa,xb,real:(1+xb)/Math.pow(defl(d0,d1,o.inf),1/yrs)-1,vol,mdd,m,maxGap:mg}}
+function fixedInc(o,r,yrs,D){const rn=r/100*(1-o.slab*1.04/100);return{yrs,final:o.amt*Math.pow(1+r/100,yrs),afterFinal:o.amt*Math.pow(1+rn,yrs),pc:r/100,xa:r/100,xb:rn,real:(1+rn)/Math.pow(D,1/yrs)-1,vol:0,mdd:0}}
 const pmt=(P,r,n)=>!P?0:r?P*r/(1-Math.pow(1+r,-n)):P/n;
 function sched(P,rate,years,months,pp){const r=rate/1200,n=Math.round(years*12),e=pmt(P,r,n);let b=P;const Y=[];pp=pp||{m:0,a:0};
 for(let y=0;y<Math.ceil(months/12);y++){let i=0,p=0;for(let k=0;k<12&&y*12+k<months;k++){const m=y*12+k;if(b>1e-9&&m<n){const ii=b*r,q=Math.min(e-ii,b);i+=ii;p+=q;b-=q}if(pp.a>0&&m+1==pp.m&&b>0){const x=Math.min(pp.a,b);p+=x;b-=x}}Y.push({i,p,e:i+p,b:Math.max(0,b)})}
@@ -106,6 +132,62 @@ ok("Part-payment cuts total interest and shortens tenure",P1.Y.reduce((x,y)=>x+y
 ok("Processing fee adds to cash invested",cl(mk({ltv:60,fee:1}).eq-mk({ltv:60}).eq,.6,1e-9));
 const z=mk({ltv:60,rate:9,term:20,fee:1,slab:0,ltcg:0,rent:1000,app:5,preA:10,preY:2,N:5}),sm=a=>a.reduce((x,y)=>x+y,0);
 ok("Cash flows reconcile: levered = unlevered + loan - fee - payments - exit balance",cl(sm(z.cfL),sm(z.cfU)+z.L-z.fee-sm(z.rows.map(r=>r.e))-z.bal[5],1e-6),(sm(z.cfL)-sm(z.cfU)).toFixed(4));
+const ST=o=>({amt:100,cin:0,cout:0,slab:30,steq:20,lteq:12.5,ltoth:12.5,cls:"eq",reinv:false,inf:()=>0,...o}),U=(y,m,d)=>Date.UTC(y,m-1,d);
+const pr=parseCSV('Date,Close\n2020-01-31,"1,234.50"\n31-01-2021,1300\n28-Feb-2021,1310');
+ok("CSV parser reads ISO, DD-MM-YYYY, DD-Mon-YYYY dates and quoted thousands",pr.rows.length==3&&pr.rows[0][1]==1234.5&&pr.rows[1][0]==U(2021,1,31)&&pr.rows[2][0]==U(2021,2,28));
+const s1=stats([[U(2010,1,1),100,0],[U(2020,1,1),200,0]],U(2010,1,1),U(2020,1,1),ST({slab:0,lteq:0}));
+ok("Price CAGR of a doubling over 3,652 days",cl(s1.pc,Math.pow(2,365/3652)-1,1e-12));
+ok("XIRR equals price CAGR with no tax, costs or dividends",cl(s1.xb,s1.pc,1e-9));
+const dd=[100,120,60,90].map((p,i)=>[U(2020,i+1,1),p,0]),s2=stats(dd,dd[0][0],dd[3][0],ST({}));
+ok("Maximum drawdown of 100, 120, 60, 90 is 50%",cl(s2.mdd,.5,1e-12));
+const g=[...Array(25)].map((_,i)=>[Date.UTC(2020,i,15),100*Math.pow(1.01,i),0]),s3=stats(g,g[0][0],g[24][0],ST({}));
+ok("Constant monthly growth has zero volatility",cl(s3.vol,0,1e-9),String(s3.vol));
+const fl=[...Array(6)].map((_,i)=>[U(2020+i,1,1),100,i?5:0]);
+ok("Cash dividends of 5% on a flat price give about 5% XIRR",cl(stats(fl,fl[0][0],fl[5][0],ST({slab:0})).xa,.05,2e-3));
+ok("Reinvested dividends of 5% on a flat price give about 5% XIRR",cl(stats(fl,fl[0][0],fl[5][0],ST({slab:0,reinv:true})).xa,.05,2e-3));
+const t2=stats([[U(2020,1,1),100,0],[U(2022,1,1),200,0]],U(2020,1,1),U(2022,1,1),ST({slab:0}));
+ok("Long-term equity gain tax is 12.5% plus 4% cess",cl(t2.afterFinal,200-100*.125*1.04,1e-9),t2.afterFinal.toFixed(2));
+ok("Entry cost of 1% reduces final value to 99",cl(stats([[U(2020,1,1),100,0],[U(2021,1,1),100,0]],U(2020,1,1),U(2021,1,1),ST({cin:1})).final,99,1e-9));
+const r5=stats([[U(2021,1,1),100,0],[U(2022,1,1),110,0]],U(2021,1,1),U(2022,1,1),ST({slab:0,steq:0,inf:()=>5}));
+ok("Real return equals 1.10/1.05 - 1 at 5% inflation",cl(r5.real,1.1/1.05-1,1e-9),r5.real.toFixed(6));
+ok("Bank FD after tax is 7% x (1 - 30% x 1.04)",cl(fixedInc(ST({}),7,1,1).xb,.07*(1-.312),1e-12));
+ok("Data outside the window is rejected",!!stats(dd,U(2010,1,1),U(2012,1,1),ST({})).err);
+const gp=[[U(2020,1,1),100,0],[U(2020,4,1),102,0],[U(2020,12,1),110,0],[U(2021,1,1),111,0]],sg=stats(gp,U(2020,1,1),U(2021,1,1),ST({}));
+ok("Gaps in an incomplete series are measured (largest gap 244 days)",Math.round(sg.maxGap)==244,String(sg.maxGap));
+const al=stats([[U(2020,1,6),100,0],[U(2021,1,1),110,0]],U(2020,1,1),U(2021,1,1),ST({slab:0,steq:0}));
+ok("Start date aligns to the first available price within 10 days",!al.err&&al.d0==U(2020,1,6));
+ok("Start more than 10 days after the requested date is rejected",!!stats([[U(2020,1,20),100,0],[U(2021,1,1),110,0]],U(2020,1,1),U(2021,1,1),ST({})).err);
+const sp=[...Array(25)].map((_,i)=>[Date.UTC(2020,i,10),100,0]),s4=sip(sp,Date.UTC(2020,0,1),Date.UTC(2022,0,1),1000,0,0);
+ok("SIP at a flat price returns exactly what was invested (24 instalments)",s4.inv==24000&&cl(s4.val,24000,1e-6)&&cl(s4.x,0,1e-9));
+const sq=[...Array(25)].map((_,i)=>[Date.UTC(2020,i,10),100*Math.pow(1.01,i),0]),s5=sip(sq,Date.UTC(2020,0,1),Date.UTC(2022,0,1),1000,0,0);
+ok("SIP in a rising market earns a positive XIRR close to 12.7%",s5.val>s5.inv&&s5.x>.11&&s5.x<.14,s5.x.toFixed(4));
+ok("SIP with no data in the window returns nothing",sip(sp,Date.UTC(2030,0,1),Date.UTC(2031,0,1),1000,0,0)===null);
+return T}
+function sip(R,t0,t1,amt,cin,cout){const fl=[],dd=[];let u=0,k="",inv=0;for(const r of R){if(r[0]<t0||r[0]>=t1)continue;const m=new Date(r[0]).toISOString().slice(0,7);if(m==k)continue;k=m;u+=amt*(1-cin/100)/r[1];inv+=amt;fl.push(-amt);dd.push(r[0])}
+let l=null;for(let i=R.length-1;i>=0;i--)if(R[i][0]<=t1){l=R[i];break}if(!l||!inv||l[0]<=dd[0])return null;const val=u*l[1]*(1-cout/100);return{inv,val,x:xirr([...fl,val],[...dd,l[0]])}}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function getJSON(url,f,o){o=o||{};const tries=o.tries||3,wait=o.wait==null?600:o.wait;let err="";
+for(let i=0;i<tries;i++){try{const r=await f(url);if(r.status==404)return{err:"Not found (HTTP 404)"};if(r.status==429||r.status>=500)err="Server busy or unavailable (HTTP "+r.status+")";else if(!r.ok)return{err:"Request refused (HTTP "+r.status+")"};else{try{return{json:await r.json()}}catch(e){return{err:"Response was not valid JSON"}}}}catch(e){err="Network or browser access (CORS) failure"}
+if(i<tries-1)await sleep(wait*Math.pow(2,i))}return{err:err+" after "+tries+" attempts"}}
+function mfRows(j){if(!j||!Array.isArray(j.data))return{err:"Unexpected response format"};const m=new Map();let bad=0;j.data.forEach(d=>{const t=pd(d&&d.date),p=parseFloat(d&&d.nav);if(!isNaN(t)&&p>0)m.set(t,[t,p,0]);else bad++});const rows=[...m.values()].sort((a,b)=>a[0]-b[0]);return rows.length<2?{err:"No usable NAV history returned"}:{rows,bad,name:j.meta&&j.meta.scheme_name}}
+async function loadMF(code,base,d){const g=await getJSON(`${base}/mf/${code}`,d.fetch,d.o);let e=g.err,m=null;if(!e){m=mfRows(g.json);e=m.err}
+if(!e){d.set(code,{rows:m.rows,t:d.now(),name:m.name});return{status:"LIVE",rows:m.rows,bad:m.bad,name:m.name,t:d.now()}}
+const c=d.get(code);return c&&c.rows?{status:"CACHED",rows:c.rows,t:c.t,name:c.name,warn:e}:{status:"UNAVAILABLE",err:e}}
+async function selfTestNet(){const T=[],ok=(n,c,d)=>T.push([n,!!c,d||""]);
+const mkF=q=>{let i=0,n=0;const f=async()=>{n++;const s=q[Math.min(i++,q.length-1)];if(s=="net")throw new Error("x");return{status:s.status,ok:s.status>=200&&s.status<300,json:async()=>{if(s.bad)throw new Error("bad");return s.body}}};f.n=()=>n;return f};
+const good={meta:{scheme_name:"Test Fund"},data:[{date:"31-01-2021",nav:"12.5"},{date:"31-12-2020",nav:"10"},{date:"30-11-2020",nav:"N.A."},{date:"31-10-2020",nav:"9"}]};
+const st={},dp=f=>({fetch:f,get:c=>st[c]||null,set:(c,v)=>{st[c]=v},now:()=>1700000000000,o:{wait:0}});
+let f=mkF([{status:200,body:good}]),r=await loadMF("1","https://x",dp(f));
+ok("Valid NAV response is parsed, sorted and marked LIVE",r.status=="LIVE"&&r.rows.length==3&&r.rows[0][1]==9&&r.bad==1&&r.name=="Test Fund");
+f=mkF([{status:500}]);r=await loadMF("1","https://x",dp(f));
+ok("Server errors are retried 3 times, then saved data is used and marked CACHED",f.n()==3&&r.status=="CACHED"&&r.t==1700000000000&&/3 attempts/.test(r.warn));
+f=mkF([{status:404}]);r=await loadMF("2","https://x",dp(f));
+ok("A 404 is not retried and is UNAVAILABLE without saved data",f.n()==1&&r.status=="UNAVAILABLE"&&!r.rows);
+f=mkF(["net","net",{status:200,body:good}]);r=await loadMF("3","https://x",dp(f));
+ok("Two network failures then success returns LIVE data",f.n()==3&&r.status=="LIVE");
+f=mkF([{status:200,bad:1}]);r=await loadMF("4","https://x",dp(f));ok("Invalid JSON is reported",r.status=="UNAVAILABLE"&&/not valid JSON/.test(r.err));
+f=mkF([{status:200,body:{meta:{},data:[]}}]);r=await loadMF("5","https://x",dp(f));ok("An empty history is reported, not shown as data",r.status=="UNAVAILABLE"&&/No usable NAV/.test(r.err));
+f=mkF(["net"]);r=await loadMF("6","https://x",dp(f));ok("Blocked or offline requests report a browser-access failure",r.status=="UNAVAILABLE"&&/CORS/.test(r.err));
 return T}
 //ENDENGINE
 //XLSX
@@ -196,7 +278,79 @@ h+=`<h2>Sensitivity: IRR on your cash</h2><p class="hint">Price growth down the 
 const sc=[["Bear",-3,-2,5],["Base",0,0,0],["Bull",3,2,-3]].map(([n,a,g,v])=>{const q=calc({...p,app:p.app+a,rg:p.rg+g,vac:Math.min(100,Math.max(0,p.vac+v)),exitv:p.exitv>0?p.exitv*Math.pow(1+a/100,p.N):0});return[n,(p.app+a).toFixed(1)+"%",(p.rg+g).toFixed(1)+"%",Math.min(100,Math.max(0,p.vac+v)).toFixed(0)+"%",pc(q.iL),pc(q.rL),fmt(q.net),fmt(q.alt.FD.nfv)]});
 h+=`<h2>Investment scenarios</h2>`+T(["Scenario","Price growth","Rent growth","Vacancy","IRR","Real IRR","Net gain","Ahead of FD by"],sc);
 $("out").innerHTML=h;$("btns").hidden=false}
-document.addEventListener("input",e=>{if(e.target.closest("#inp")){ed.add(e.target.id);run()}});
+document.addEventListener("input",e=>{if(e.target.closest("#inp")){ed.add(e.target.id);run();renderTable()}});
+let AS=[],LASTMA=null,mfOK="untested";const fD=t=>new Date(t).toISOString().slice(0,10),KD={pri:"Price index (excludes dividends)",tri:"Total return index (includes dividends)",mf:"Mutual fund NAV",sh:"Share price",gold:"Gold price",gsec:"Government securities index",oth:"Other"};
+const mbase=()=>{const x=(ls("wbProxy")||"").trim().replace(/\/$/,"");return x?x+"/mfapi":"https://api.mfapi.in"};
+const mdeps=()=>({fetch:u=>fetch(u),get:c=>ls("mf_"+c),set:(c,v)=>ls("mf_"+c,v),now:Date.now});
+const WK=`export default{async fetch(req){const u=new URL(req.url),h={"Access-Control-Allow-Origin":"*"};
+if(req.method=="OPTIONS")return new Response(null,{headers:h});
+if(req.method!="GET"||!u.pathname.startsWith("/mfapi/"))return new Response("Not allowed",{status:403,headers:h});
+const t="https://api.mfapi.in/"+u.pathname.slice(7)+u.search,c=caches.default;let r=await c.match(t);
+if(!r){r=await fetch(t);r=new Response(r.body,r);r.headers.set("Cache-Control","public, max-age=21600");await c.put(t,r.clone())}
+const o=new Response(r.body,r);o.headers.set("Access-Control-Allow-Origin","*");return o}}`;
+$("ma").innerHTML=`<h2>Multi-asset comparison</h2><p class="hint">Mutual fund NAVs load automatically from AMFI data. Everything else is imported from CSV files you download: a Date column, a Close, Price or NAV column, and an optional Dividend column. The tool never invents market prices. Dates like 31-01-2021 are read day first.</p>
+<div id="mas"></div>
+<label for="maF">Add price history files (CSV)</label><input id="maF" type="file" accept=".csv,.txt,text/csv" multiple><div id="maM" class="hint"></div><div id="mal"></div>
+<div class="f"><fieldset><legend>Mutual fund NAV (AMFI data)</legend><label for="maQ">Search fund name</label><input id="maQ" placeholder="e.g. HDFC Top 100 Direct Growth"><button id="maSb" type="button">Search</button><div id="maQR"></div>
+<label for="maX">Backend proxy URL (optional)</label><input id="maX" placeholder="https://your-worker.workers.dev"><details><summary class="hint">Cloudflare Worker for the proxy (no API keys needed)</summary><pre style="white-space:pre-wrap;font-size:.72rem">${esc(WK)}</pre></details></fieldset>
+<fieldset><legend>Period and amount</legend><label for="maP">Investment period</label><select id="maP"><option value="1">1 year</option><option value="3">3 years</option><option value="5">5 years</option><option value="10" selected>10 years</option><option value="15">15 years</option><option value="20">20 years</option><option value="c">Custom dates</option></select>
+<label for="maS">Custom start date</label><input id="maS" type="date"><label for="maE">Custom end date</label><input id="maE" type="date"><label for="maA">Amount invested at the start (₹)<span class="tag">Assumption</span></label><input id="maA" type="number" value="1000000">
+<label for="maSP">Monthly SIP amount (₹)<span class="tag">Assumption</span></label><input id="maSP" type="number" value="10000">
+<label for="maCI">Transaction cost on buying (%)<span class="tag">Assumption</span></label><input id="maCI" type="number" step="any" value="0.1"><label for="maCO">Transaction cost on selling (%)<span class="tag">Assumption</span></label><input id="maCO" type="number" step="any" value="0.1">
+<label for="maR">Dividends and distributions</label><select id="maR"><option value="r">Reinvested after tax</option><option value="c">Paid out as cash after tax</option></select></fieldset>
+<fieldset><legend>Capital gains tax rates (check current rules)</legend><label for="maT1">Equity, held 12 months or less (%)<span class="tag">Assumption</span></label><input id="maT1" type="number" step="any" value="20"><label for="maT2">Equity, held over 12 months (%)<span class="tag">Assumption</span></label><input id="maT2" type="number" step="any" value="12.5"><label for="maT3">Gold, held over 24 months (%)<span class="tag">Assumption</span></label><input id="maT3" type="number" step="any" value="12.5">
+<p class="hint">Gold held 24 months or less and debt or hybrid funds are taxed at your slab rate. A 4% cess is added. Dividends are taxed at your slab rate. The equity exemption limit is not applied. SIP results are before tax.</p></fieldset></div><div id="mar" aria-live="polite"></div>`;
+$("maX").value=ls("wbProxy")||"";
+const saveAS=()=>{try{localStorage.setItem("wbAssets",JSON.stringify(AS.map(({live,...a})=>a)))}catch(e){$("maM").textContent="Imported data could not be saved on this device (storage is full or blocked). It will be lost when you close the page."}};
+const stOf=a=>a.src=="mfapi"?(a.live?"LIVE":"CACHED"):"MANUAL";
+function renderSrc(){const cnt=(...k)=>AS.filter(a=>k.includes(a.kind)).length,mfa=AS.filter(a=>a.src=="mfapi"),wi=latest(W.inf),ws=W.src=="live"?"LIVE":W.src=="none"?"UNAVAILABLE":"CACHED",m=n=>n?"MANUAL":"UNAVAILABLE";
+const mp=(...k)=>{const x=AS.filter(a=>k.includes(a.kind));return x.length?fD(Math.min(...x.map(a=>a.r[0][0])))+" to "+fD(Math.max(...x.map(a=>a.r[a.r.length-1][0]))):"-"};
+const rows=[["World Bank: inflation, lending and deposit rates","Public API, called from your browser",wi?Object.keys(W.inf).map(Number).sort()[0]+" to "+wi[0]:"-",W.t?fD(W.t):"-",[ws,ws],"Annual data. The latest year is often unpublished."],
+["AMFI mutual fund NAV","Third-party mirror mfapi.in (free, unofficial, rate-limited). Official AMFI files need a backend",mfa.length?mp("mf"):"-",mfa.length?fD(Math.max(...mfa.map(a=>a.t||0))):"-",mfa.length?(s=>[s,s])(mfa.some(a=>a.live)?"LIVE":"CACHED"):mfOK=="failed"?["UNAVAILABLE","UNAVAILABLE"]:["NOT LOADED","ND"],mfOK=="failed"?"Last request failed. Likely browser access (CORS) or rate limit: set a proxy or import a CSV.":"Not tested from a browser by the developer."],
+["NSE Indices: price and total return indices","No documented public API. Download CSV from niftyindices.com and import",mp("pri","tri"),"-",[m(cnt("pri","tri")),m(cnt("pri","tri"))],"Use TRI series to include dividends."],
+["NSE and BSE share prices","No verified public API. Import CSV",mp("sh"),"-",[m(cnt("sh")),m(cnt("sh"))],""],
+["IBJA gold benchmark","No verified public API. Import CSV",mp("gold"),"-",[m(cnt("gold")),m(cnt("gold"))],""],
+["RBI DBIE: government securities","No verified public API. Import a G-sec total return index as CSV",mp("gsec"),"-",[m(cnt("gsec")),m(cnt("gsec"))],"Yields are not returns."],
+["RBI DBIE: deposit and lending rates","No verified public API. World Bank annual rates are used instead","-","-",["UNAVAILABLE","UNAVAILABLE"],"Enter FD and loan rates yourself."],
+["RBI and MoSPI inflation","No verified public API. World Bank inflation is used instead","-","-",["UNAVAILABLE","UNAVAILABLE"],""]].map(r=>[r[0],r[1],r[2],r[3],[r[4][0],r[4][1]=="ND"?"ND":r[4][1]],r[5]]);
+$("mas").innerHTML="<h3>Data sources and connection status</h3>"+T(["Source","Access method","Data period","Last updated","Status","Notes"],rows)}
+function renderList(){renderSrc();$("mal").innerHTML=AS.length?AS.map((a,i)=>`<div class="r2"><input value="${esc(a.n)}" data-i="${i}" data-f="n" aria-label="Asset name"><select data-i="${i}" data-f="kind" aria-label="Data type">${Object.entries(KD).map(([k,v])=>`<option value="${k}"${a.kind==k?" selected":""}>${v}</option>`).join("")}</select><select data-i="${i}" data-f="c" aria-label="Tax class"><option value="eq"${a.c=="eq"?" selected":""}>Taxed as equity</option><option value="gold"${a.c=="gold"?" selected":""}>Taxed as gold</option><option value="debt"${a.c=="debt"?" selected":""}>Taxed at slab rate</option></select><span class="hint">${stOf(a)}, ${fD(a.r[0][0])} to ${fD(a.r[a.r.length-1][0])}, ${a.r.length} rows${a.bad?", "+a.bad+" skipped":""}, updated ${fD(a.t||0)}</span>${a.src=="mfapi"?`<button class="g" data-rf="${i}" type="button">Refresh</button>`:""}<button class="g" data-rm="${i}" type="button">Remove</button></div>`).join(""):'<p class="hint">No assets yet. The FD and bond rows below use your own rates.</p>'}
+function renderTable(){const f=id=>parseFloat($(id).value),box=$("mar"),ends=AS.map(a=>a.r[a.r.length-1][0]);let t0,t1;
+if($("maP").value=="c"){t0=Date.parse($("maS").value);t1=Date.parse($("maE").value)}else{t1=AS.length?Math.min(...ends):Date.parse(new Date().toISOString().slice(0,10));const d=new Date(t1);d.setUTCFullYear(d.getUTCFullYear()-$("maP").value);t0=d.getTime()}
+const o={amt:f("maA"),cin:f("maCI"),cout:f("maCO"),slab:num("slab"),steq:f("maT1"),lteq:f("maT2"),ltoth:f("maT3"),reinv:$("maR").value=="r",inf:y=>W.inf[y]!=null?W.inf[y]:(num("infA")||0)},sa=f("maSP");
+if(!(o.amt>0&&sa>=0&&t1>t0&&[o.cin,o.cout,o.steq,o.lteq,o.ltoth,o.slab].every(x=>isFinite(x)&&x>=0))){box.innerHTML='<div class="note bad">Check the amounts, the period dates and the rates. All must be valid numbers, with the end date after the start date.</div>';LASTMA=null;return}
+const yrs=(t1-t0)/864e5/365,D=defl(t0,t1,o.inf);let est=0;for(let y=new Date(t0).getUTCFullYear();y<=new Date(t1).getUTCFullYear();y++)if(W.inf[y]==null)est++;
+const rows=[];AS.forEach(a=>{const r=stats(a.r,t0,t1,{...o,cls:a.c});rows.push({n:a.n,a,s:r.err?null:sip(a.r,t0,t1,sa,o.cin,o.cout),...r})});
+[["Bank fixed deposit",num("fd")],["Bonds",num("bond")]].forEach(([n,r])=>{if(isFinite(r))rows.push({n:n+" (your rate)",k:"Fixed income, your rate",...fixedInc(o,r,yrs,D)})});
+const rfA=num("fd")/100*(1-o.slab*1.04/100);rows.forEach(r=>{r.ra=r.vol>0?(r.xb-rfA)/r.vol:NaN});
+rows.sort((a,b)=>(isFinite(b.xb)?b.xb:-9)-(isFinite(a.xb)?a.xb:-9));
+const ok=rows.filter(r=>!r.err&&isFinite(r.xb)),bt=ok[0],br=ok.filter(r=>isFinite(r.ra)).sort((a,b)=>b.ra-a.ra)[0],ns=[];
+ns.push(`Window: ${fD(t0)} to ${fD(t1)} (${yrs.toFixed(1)} years), ${fmt(o.amt)} invested in each asset, or ${fmt(sa)} a month for the SIP.`);
+if(bt)ns.push(`Best after-tax return: ${bt.n} at ${pc(bt.xb)} a year.`+(br?` Best return per unit of risk: ${br.n}.`:""));
+if(est)ns.push(`${est} calendar year(s) in this window have no World Bank inflation figure, so your assumed rate is used. Real returns are estimates.`);
+if(!AS.length)ns.push("Add at least one asset to compare market returns.");
+if(LAST){const{p,R}=LAST;ns.push(`Property from the main analysis, over its own ${p.N}-year cash flows: after-tax XIRR ${pc(p.ltv>0?R.xL:R.xU)}, real ${pc(p.ltv>0?R.rL:R.rU)}. Not a same-period lump-sum comparison.`)}
+const meta=r=>r.a?{k:KD[r.a.kind]||"Other",s:(r.a.src=="mfapi"?"AMFI data via mfapi.in":"Imported CSV")+(r.err?"":", "+fD(r.d0)+" to "+fD(r.d1)),st:stOf(r.a),u:fD(r.a.t||0)}:{k:r.k,s:"Your input",st:"MANUAL",u:"-"};
+const wr=r=>{if(r.err)return r.err;const w=[];if(r.maxGap>45)w.push("Gaps up to "+Math.round(r.maxGap)+" days");if(r.a&&r.a.kind=="pri")w.push("Excludes dividends, compare with a TRI");if(r.a&&r.a.src=="mfapi"&&!r.a.live)w.push("Not live data");return w.join("; ")||"None"};
+const hd=["Asset","Data type","Source and period","Status, last updated","Final value, before tax","Absolute return","Final value, after tax","Price-only CAGR","Total return XIRR","After-tax XIRR","Real after-tax","Volatility","Max drawdown","Return per unit of risk","SIP invested","SIP value","SIP XIRR","Warnings"];
+const cells=r=>{const m=meta(r),st=[m.st+(m.u!="-"?" "+m.u:""),m.st];return r.err?[r.n,m.k,m.s,st,"","","","","","","","","","","","","",r.err]:[r.n,m.k,m.s,st,fmt(r.final),pc(r.final/o.amt-1),fmt(r.afterFinal),pc(r.pc),pc(r.xa),pc(r.xb),pc(r.real),r.vol===0?"none":pc(r.vol),pc(r.mdd),isFinite(r.ra)?r.ra.toFixed(2):"n/a",r.s?fmt(r.s.inv):"n/a",r.s?fmt(r.s.val):"n/a",r.s?pc(r.s.x):"n/a",wr(r)]};
+LASTMA=[hd,...rows.map(r=>{const m=meta(r);return r.err?[r.n,m.k,m.s,m.st+" "+m.u,r.err]:[r.n,m.k,m.s,m.st+" "+m.u,r.final,(r.final/o.amt-1)*100,r.afterFinal,r.pc*100,r.xa*100,r.xb*100,r.real*100,isFinite(r.vol)?r.vol*100:"n/a",r.mdd*100,isFinite(r.ra)?r.ra:"n/a",r.s?r.s.inv:"n/a",r.s?r.s.val:"n/a",r.s?r.s.x*100:"n/a",wr(r)]})];
+const C=["var(--g)","var(--gold)","var(--neg)","#3B7DD8","#8E5BC4","#E08A2E","#2A9D8F","#C2547A"],ch=rows.filter(r=>r.m&&r.m.length>2);let svg="";
+if(ch.length){const W2=600,H=220,m=8,all=ch.flatMap(r=>r.m.map(x=>x/r.m[0]*100)),mx=Math.max(...all),mn=Math.min(...all),Y=v=>H-22-(v-mn)/(mx-mn||1)*(H-40);
+svg=`<svg viewBox="0 0 ${W2} ${H}" width="100%" role="img" aria-label="Growth of 100 invested in each asset, price only">${ch.map((r,i)=>`<polyline fill="none" stroke="${C[i%8]}" stroke-width="2" points="${r.m.map((x,j)=>(m+j*(W2-2*m)/(r.m.length-1)).toFixed(1)+","+Y(x/r.m[0]*100).toFixed(1)).join(" ")}"/>`).join("")}<text x="${m}" y="12" font-size="11" fill="currentColor">${mx.toFixed(0)}</text><text x="${m}" y="${H-5}" font-size="11" fill="currentColor">${fD(t0)} to ${fD(t1)}</text></svg><p class="hint">Growth of 100 invested, price or NAV only, month-end. ${ch.map((r,i)=>`<b style="color:${C[i%8]}">${esc(r.n)}</b>`).join(", ")}</p>`}
+box.innerHTML=ns.map((t,i)=>`<div class="note${i==1?" ok":""}">${t}</div>`).join("")+svg+T(hd,rows.map(cells))+'<p class="hint">Price-only CAGR excludes dividends. Total return XIRR includes dividends. A total return index already includes them. After-tax figures use the rates above. Volatility uses month-end prices and needs 12 months of data. Maximum drawdown uses every imported price. Return per unit of risk is after-tax XIRR less the after-tax FD rate, divided by volatility. SIP buys once a month at the first available price and is before tax. Past performance does not predict future returns.</p>'}
+const onEdit=e=>{const t=e.target;if(t.dataset.f){AS[t.dataset.i][t.dataset.f]=t.value;saveAS()}if(t.id=="maX")ls("wbProxy",t.value);renderTable()};
+$("ma").addEventListener("input",onEdit);$("ma").addEventListener("change",e=>{onEdit(e);if(e.target.dataset.f=="kind")renderList()});
+const addMF=async(code,name)=>{$("maM").textContent="Loading NAV history…";const r=await loadMF(code,mbase(),mdeps());if(r.status=="UNAVAILABLE"){mfOK="failed";$("maM").textContent="Could not load this fund: "+r.err+". If this is a browser access (CORS) problem, set a backend proxy above or import a CSV.";renderList();return}
+mfOK="ok";const a={n:r.name||name,c:"eq",src:"mfapi",code,kind:"mf",r:r.rows,bad:r.bad||0,t:r.t,live:r.status=="LIVE"};const ix=AS.findIndex(x=>x.code==code);if(ix>=0)AS[ix]=a;else AS.push(a);
+$("maM").textContent=r.status=="CACHED"?"Live fetch failed ("+r.warn+"). Showing saved data from "+fD(r.t)+", marked CACHED.":"Loaded "+a.r.length+" NAV rows.";saveAS();renderList();renderTable()};
+$("ma").addEventListener("click",async e=>{const d=e.target.dataset||{};if(d.rm!=null){AS.splice(+d.rm,1);saveAS();renderList();renderTable()}else if(d.rf!=null){const a=AS[+d.rf];await addMF(a.code,a.n)}else if(d.add){await addMF(d.add,d.nm)}});
+$("maSb").addEventListener("click",async()=>{const q=$("maQ").value.trim();if(q.length<3){$("maQR").innerHTML='<p class="hint">Type at least 3 characters.</p>';return}
+$("maQR").innerHTML='<p class="hint">Searching…</p>';const g=await getJSON(`${mbase()}/mf/search?q=${encodeURIComponent(q)}`,u=>fetch(u),{tries:2});
+if(g.err||!Array.isArray(g.json)){mfOK="failed";$("maQR").innerHTML=`<div class="note bad">Search failed: ${esc(g.err||"unexpected response")}. This is usually a browser access (CORS) block or rate limit. Set a backend proxy or import a CSV.</div>`;renderSrc();return}
+mfOK="ok";$("maQR").innerHTML=g.json.length?g.json.slice(0,10).map(x=>`<button class="g" style="display:block;text-align:left;width:100%" type="button" data-add="${esc(x.schemeCode)}" data-nm="${esc(x.schemeName)}">${esc(x.schemeName)} (${esc(x.schemeCode)})</button>`).join(""):'<p class="hint">No schemes found.</p>';renderSrc()});
+$("maF").addEventListener("change",async e=>{const msgs=[];for(const f of e.target.files){const{rows,bad}=parseCSV(await f.text());if(rows.length<2){msgs.push(`${f.name}: no valid Date and price rows found, skipped.`);continue}const g=f.name;AS.push({n:g.replace(/\.[^.]+$/,""),c:/gold|ibja/i.test(g)?"gold":/debt|gsec|g-sec|bond/i.test(g)?"debt":"eq",src:"csv",kind:/tri|total/i.test(g)?"tri":/gold|ibja/i.test(g)?"gold":/gsec|g-sec/i.test(g)?"gsec":/nav|fund/i.test(g)?"mf":"pri",r:rows,bad,t:Date.now()})}$("maM").textContent=msgs.join(" ");saveAS();e.target.value="";renderList();renderTable()});
+AS=(ls("wbAssets")||[]).filter(a=>a&&a.r&&a.r.length>1).map(a=>({kind:"pri",src:"csv",...a}));renderList();renderTable();
 $("cty").onchange=load;$("retry").onclick=load;$("sv").onclick=saveAll;$("pdf").onclick=()=>window.print();$("xls").onclick=()=>{if(!LAST)return;const{p,R}=LAST,P=x=>x*100,n=R.rows.length;
 const S=[{n:"Summary",r:[["Metric","Value"],["IRR on your cash, with loan (%)",P(R.iL)],["IRR without loan (%)",P(R.iU)],["XIRR with loan (%)",P(R.xL)],["Real IRR with loan (%)",P(R.rL)],["Property value CAGR (%)",P(R.g)],["Equity multiple",R.em],["Cash invested",R.inv],["Total interest paid",R.totInt],["Sale value",R.exit],["Capital gains tax",R.cg],["Net gain, nominal",R.net],["Net gain, today's money",R.realNet],["Gross rental yield (%)",P(R.gy)],["Net yield year 1 (%)",P(R.ny)],["Monthly EMI",R.emi]]},
 {n:"Assumptions",r:[["Assumption","Value"],...F.flatMap(([g,fs])=>fs.map(([i,l])=>[l,i=="date0"?p.date0:p[i]]))]},
@@ -204,9 +358,9 @@ const S=[{n:"Summary",r:[["Metric","Value"],["IRR on your cash, with loan (%)",P
 {n:"Loan schedule",r:[["Year","Interest","Principal","Payment","Closing balance"],...R.rows.map(r=>[r.t,r.i,r.p,r.e,r.bal]),[],["Monthly EMI",R.emi],["Loan amount",R.L],["Processing fee",R.fee]]},
 {n:"Asset comparison",r:[["Alternative","Pre-tax %","After-tax %","Alternative ends with","Property ends with","Property ahead by"],...Object.entries(R.alt).map(([k,a])=>[k,{FD:p.fd,Bonds:p.bond,"Equity mutual fund":p.mf}[k],a.rn,a.B,a.W,a.nfv])]},
 {n:"Taxes",r:[["Item","Amount"],...R.rows.map(r=>["Rental income tax, year "+r.t,r.tax]),["Sale value after selling costs",R.sale],["Taxable capital gain",Math.max(0,R.gain)],["Capital gains rate incl. cess (%)",P(R.cgr)],["Capital gains tax",R.cg],["Stamp duty, registration and brokerage",R.buy]]},
-{n:"Data sources",r:[["Indicator","Latest year","Latest value","Status"],...[["Inflation FP.CPI.TOTL.ZG",W.inf],["Lending rate FR.INR.LEND",W.lend],["Deposit rate FR.INR.DPST",W.dep]].map(([k,o])=>{const l=latest(o);return[k,l?l[0]:"none",l?l[1]:"none",l?(W.src=="live"?"LIVE":"CACHED"):"NO DATA"]}),["Retrieved",W.t?new Date(W.t).toISOString():"bundled snapshot"]]}];
+...(LASTMA?[{n:"Multi-asset comparison",r:LASTMA}]:[]),{n:"Data sources",r:[["Indicator","Latest year","Latest value","Status"],...[["Inflation FP.CPI.TOTL.ZG",W.inf],["Lending rate FR.INR.LEND",W.lend],["Deposit rate FR.INR.DPST",W.dep]].map(([k,o])=>{const l=latest(o);return[k,l?l[0]:"none",l?l[1]:"none",l?(W.src=="live"?"LIVE":"CACHED"):"NO DATA"]}),["Retrieved",W.t?new Date(W.t).toISOString():"bundled snapshot"]]}];
 const a=document.createElement("a");a.href=URL.createObjectURL(xlsx(S));a.download="property-analysis.xlsx";document.body.appendChild(a);a.click();a.remove()};
-$("tests").onclick=()=>{const t=selfTest(),p=t.filter(x=>x[1]).length;$("tr").innerHTML=`<div class="note ${p==t.length?"ok":"bad"}"><b>${p} of ${t.length} formula tests passed</b><br>${t.map(x=>(x[1]?"Pass: ":"FAIL: ")+x[0]+(x[2]?" ("+x[2]+")":"")).join("<br>")}</div>`};
+$("tests").onclick=async()=>{const t=[...selfTest(),...await selfTestNet()],p=t.filter(x=>x[1]).length;$("tr").innerHTML=`<div class="note ${p==t.length?"ok":"bad"}"><b>${p} of ${t.length} formula tests passed</b><br>${t.map(x=>(x[1]?"Pass: ":"FAIL: ")+x[0]+(x[2]?" ("+x[2]+")":"")).join("<br>")}</div>`};
 (async()=>{let list=ls("wbList")||[["IND","India","IN"],["USA","United States","US"],["GBR","United Kingdom","GB"],["ARE","United Arab Emirates","AE"],["AUS","Australia","AU"],["SGP","Singapore","SG"],["DEU","Germany","DE"]];
 try{const j=await(await fetch(WBU+"country?format=json&per_page=400")).json(),l=j[1].filter(c=>c.region&&c.region.value!="Aggregates").map(c=>[c.id,c.name,c.iso2Code]).sort((a,b)=>a[1].localeCompare(b[1]));if(l.length>50){list=l;ls("wbList",l)}}catch(e){}
 $("cty").innerHTML=list.map(c=>`<option value="${c[0]}">${c[1]}</option>`).join("");$("cty").value="IND";load()})();
