@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Property Returns Calculator (World Bank data)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{--bg:#F5F4EF;--card:#fff;--ink:#1B2B27;--mut:#5E6B66;--line:#D9D7CC;--g:#1C3A32;--gold:#9C7A2E;--neg:#A63A2E;--pos:#1F7A4D;--hero:#1C3A32;--herot:#F5F4EF}
+@media (prefers-color-scheme:dark){:root{--bg:#0F1A17;--card:#17262F;--ink:#E7EEEA;--mut:#98A8A2;--line:#2A3B36;--g:#5FAF98;--gold:#D3B15F;--neg:#F08A7E;--pos:#6FD19A;--hero:#0A1210;--herot:#E7EEEA}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+.w{max-width:780px;margin:0 auto;padding:16px}
+h1,h2,.big{font-family:Georgia,"Times New Roman",serif;font-weight:600}
+h1{font-size:1.8rem;line-height:1.15;margin:8px 0}h2{font-size:1.2rem;margin:22px 0 6px}
+.hint{color:var(--mut);font-size:.88rem;margin:2px 0 8px}
+label{display:block;font-weight:600;margin-top:14px}
+input,select,button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%}
+input[type=checkbox]{width:auto;accent-color:var(--g)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{cursor:pointer;background:var(--g);color:#fff;border-color:var(--g);width:auto;margin:10px 8px 0 0}
+button.g{background:var(--card);color:var(--ink);border-color:var(--line)}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px 16px 16px;margin-top:14px}
+#st{padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);font-size:.9rem;margin-top:10px}
+#st.err{border-color:var(--neg)}#st.ok{border-color:var(--pos)}
+.sc{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.85rem;font-variant-numeric:tabular-nums}
+th,td{padding:5px 6px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+td input{min-width:92px;padding:6px 8px;font-size:16px}
+.src{font-size:.75rem;color:var(--mut)}
+.hero{background:var(--hero);color:var(--herot);border-radius:14px;padding:18px;display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.big{font-size:2.3rem;line-height:1.1}.hero small{display:block;opacity:.8}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0}
+.m{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.m b{display:block;font-size:1.1rem}.m span{font-size:.82rem;color:var(--mut)}
+.note{background:var(--card);border-left:4px solid var(--gold);border-radius:6px;padding:8px 12px;margin:8px 0;font-size:.92rem}
+.note.bad{border-color:var(--neg)}.note.ok{border-color:var(--pos)}
+footer{color:var(--mut);font-size:.8rem;margin:20px 0}a{color:var(--g)}
+</style>
+</head>
+<body>
+<div class="w">
+<h1>Property returns calculator</h1>
+<p class="hint">Pick a country. Inflation, lending rates and deposit rates load from the World Bank, year by year.</p>
+<div id="st">Loading World Bank data…</div>
+<button id="retry" class="g" type="button" hidden>Retry World Bank</button><button id="ex" type="button">Load example</button><button class="g" id="rs" type="button">Reset</button>
+
+<section><h2>1. Property and purchase</h2>
+<label for="cty">Country</label><select id="cty"></select>
+<label for="cc">Currency code</label><input id="cc" maxlength="3" placeholder="e.g. INR">
+<p class="hint">Filled for common countries. World Bank data is in percentages, so no currency conversion is used.</p>
+<div class="row"><div><label for="py">Purchase year</label><input id="py" type="number" inputmode="numeric" placeholder="e.g. 2015"></div>
+<div><label for="ey">Evaluation or sale year</label><input id="ey" type="number" inputmode="numeric" placeholder="e.g. 2026"></div></div>
+<label for="price">Purchase price</label><input id="price" type="number" inputmode="decimal" placeholder="0">
+<label for="extra">Additional purchase costs</label><input id="extra" type="number" inputmode="decimal" placeholder="0">
+<p class="hint">Registration, stamp duty, interiors, renovations and other initial expenses.</p>
+<label for="exitv">Current value, or net sale proceeds if sold</label><input id="exitv" type="number" inputmode="decimal" placeholder="0">
+<p class="hint">After brokerage and other sale costs. The World Bank has no property prices, so this stays your input.</p></section>
+
+<section><h2>2. Loan</h2>
+<label><input type="checkbox" id="ln"> Include a loan</label>
+<div id="lnf" hidden><div class="row"><div><label for="L">Loan amount</label><input id="L" type="number" inputmode="decimal"></div>
+<div><label for="rate">Interest rate (% a year)</label><input id="rate" type="number" inputmode="decimal" step="any"></div></div>
+<p class="hint" id="rh"></p>
+<label for="term">Loan term (years)</label><input id="term" type="number" inputmode="numeric">
+<p class="hint">Loan arrives in the purchase year. Twelve instalments are counted for each year from purchase to evaluation.</p></div></section>
+
+<section><h2>3. Yearly income and costs</h2>
+<div class="row"><div><label for="r1">First-year rent received or saved</label><input id="r1" type="number" inputmode="decimal"></div>
+<div><label for="gr">Rent growth (% a year)</label><input id="gr" type="number" step="any"></div></div>
+<button class="g" id="fill" type="button">Fill rent for all years</button>
+<label for="inf">Inflation used when World Bank has no figure (%)</label><input id="inf" type="number" step="any">
+<p class="hint">Years without a published figure carry forward the latest earlier year. You can overwrite any year.</p>
+<div id="tbl"></div></section>
+
+<div id="out" aria-live="polite"></div>
+<footer>Data: World Bank Indicators API, consumer inflation (FP.CPI.TOTL.ZG), lending interest rate (FR.INR.LEND), deposit interest rate (FR.INR.DPST). Indicative estimates only. Not investment, tax or legal advice. Taxes are excluded unless entered as tax benefits.</footer>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const CUR={IN:"INR",US:"USD",GB:"GBP",AE:"AED",AU:"AUD",SG:"SGD",CA:"CAD",JP:"JPY",CN:"CNY",SA:"SAR",ZA:"ZAR",NZ:"NZD",CH:"CHF",BR:"BRL",MX:"MXN",ID:"IDR",MY:"MYR",TH:"THB",PK:"PKR",BD:"BDT",LK:"LKR",NP:"NPR",KE:"KES",NG:"NGN",DE:"EUR",FR:"EUR",IT:"EUR",ES:"EUR",NL:"EUR",IE:"EUR",PT:"EUR"};
+const BASE="https://api.worldbank.org/v2/";
+let rows=[],W={inf:{},lend:{},dep:{}},iso2={},rateEdited=false;
+const mo=x=>{const c=$("cc").value.trim().toUpperCase(),v=Math.round(x);try{return new Intl.NumberFormat(undefined,c.length==3?{style:"currency",currency:c,maximumFractionDigits:0}:{maximumFractionDigits:0}).format(v)}catch(e){return v.toLocaleString()}};
+const pc=x=>isFinite(x)?(x*100).toFixed(1)+"%":"n/a";
+const num=id=>parseFloat($(id).value)||0;
+const st=(t,c)=>{$("st").textContent=t;$("st").className=c||"";$("retry").hidden=c!="err"};
+async function wb(c,ind){const r=await fetch(`${BASE}country/${c}/indicator/${ind}?format=json&per_page=200&date=1990:${new Date().getFullYear()}`);if(!r.ok)throw 0;const j=await r.json(),o={};(j[1]||[]).forEach(d=>{if(d.value!=null)o[+d.date]=d.value});return o}
+const latest=o=>{const k=Object.keys(o).map(Number).sort((a,b)=>b-a)[0];return k?[k,o[k]]:null};
+async function load(){const c=$("cty").value;st("Loading World Bank data…");
+try{const [a,b,d]=await Promise.all([wb(c,"FP.CPI.TOTL.ZG"),wb(c,"FR.INR.LEND").catch(()=>({})),wb(c,"FR.INR.DPST").catch(()=>({}))]);W={inf:a,lend:b,dep:d};
+const li=latest(a),ll=latest(b);
+if(li)$("inf").value=li[1].toFixed(2);
+if(ll&&!rateEdited)$("rate").value=ll[1].toFixed(2);
+$("rh").textContent=ll?`World Bank lending rate: ${ll[1].toFixed(2)}% (${ll[0]}). Edit to match your loan.`:"No World Bank lending rate for this country. Enter your loan rate.";
+st(li?`World Bank loaded. Latest inflation: ${li[1].toFixed(2)}% (${li[0]}).`:"No World Bank inflation data for this country. Enter inflation by year.",li?"ok":"err");
+}catch(e){st("Could not reach the World Bank. Open this file from your own website or browser, check your connection, then retry. You can still type inflation by year.","err")}
+applyWB();run()}
+function applyWB(){const ks=Object.keys(W.inf).map(Number).sort((a,b)=>a-b);rows.forEach((r,i)=>{if(i==0||r.src=="user")return;if(W.inf[r.y]!=null){r.inf=W.inf[r.y];r.src="wb"}else{const p=ks.filter(k=>k<r.y).pop();r.inf=p!=null?W.inf[p]:num("inf");r.src=p!=null?"carried":"fallback"}});draw()}
+function years(){const py=Math.round(num("py")),ey=Math.round(num("ey"));return py>1900&&ey>py&&ey-py<=50?[py,ey]:null}
+function sync(){const ys=years();if(!ys){rows=[];$("tbl").innerHTML='<p class="hint">Enter a purchase year and a later evaluation year to add yearly amounts.</p>';return}
+const old=Object.fromEntries(rows.map(r=>[r.y,r]));rows=[];for(let y=ys[0];y<=ys[1];y++)rows.push(old[y]||{y,inc:0,exp:0,tax:0,inf:0,src:""});applyWB()}
+const SL={wb:"World Bank",carried:"carried forward",fallback:"fallback",user:"edited","":""};
+function draw(){if(!rows.length)return;$("tbl").innerHTML=`<div class="sc"><table><tr><th>Year</th><th>Rent received or saved</th><th>Maintenance and costs</th><th>Tax benefit</th><th>Inflation %</th><th>Inflation source</th></tr>${rows.map((r,i)=>`<tr><td>${r.y}</td>${["inc","exp","tax","inf"].map(k=>`<td><input type="number" inputmode="decimal" step="any" data-i="${i}" data-k="${k}" value="${k=="inf"?(+r.inf).toFixed(2):r[k]}" aria-label="${k} ${r.y}" ${k=="inf"&&i==0?"disabled":""}></td>`).join("")}<td class="src">${i?SL[r.src]:"base year"}</td></tr>`).join("")}</table></div>`}
+function irr(cf){const f=r=>cf.reduce((a,c,i)=>a+c/Math.pow(1+r,i),0);let lo=-.99,hi=10;if(f(lo)*f(hi)>0)return NaN;for(let i=0;i<120;i++){const m=(lo+hi)/2;f(lo)*f(m)<=0?hi=m:lo=m}return(lo+hi)/2}
+function run(){const ys=years();if(!ys||!rows.length){$("out").innerHTML="";return}
+const N=ys[1]-ys[0],price=num("price"),extra=num("extra"),ex=num("exitv"),on=$("ln").checked;
+const net=rows.map(r=>r.inc+r.tax-r.exp),U=net.slice();U[0]-=price+extra;U[N]+=ex;
+let L=on?Math.min(num("L"),price):0,rt=num("rate")/1200,n=Math.max(1,num("term"))*12,pm=L?(rt?L*rt/(1-Math.pow(1+rt,-n)):L/n):0,bal=L,m=0;const emi=[];
+for(let t=0;t<=N;t++){let p=0;for(let k=0;k<12;k++){if(m<n&&bal>0){const i=bal*rt,pay=Math.min(pm,bal+i);p+=pay;bal-=pay-i}m++}emi.push(p)}
+const Lv=U.map((c,t)=>c-emi[t]);Lv[0]+=L;Lv[N]-=bal;
+const D=[1];for(let t=1;t<=N;t++)D.push(D[t-1]*(1+rows[t].inf/100));
+const re=a=>a.map((c,t)=>c/D[t]),sum=a=>a.reduce((x,y)=>x+y,0);
+const iU=irr(U),iL=irr(Lv),rU=irr(re(U)),rL=irr(re(Lv)),inv=-sum(U.filter(c=>c<0)),invL=-sum(Lv.filter(c=>c<0)),notes=[];
+const dv=[];for(let y=ys[0]+1;y<=ys[1];y++)if(W.dep[y]!=null)dv.push(W.dep[y]);
+const dep=dv.length?dv.reduce((a,b)=>a+b,0)/dv.length/100:NaN;
+if(!ex)notes.push(["bad","Enter the current value or net sale proceeds, or the result will show a total loss."]);
+if(isFinite(dep)&&isFinite(iU))notes.push([iU>dep?"ok":"bad",`Bank deposits paid about ${pc(dep)} a year on average (World Bank, ${dv.length} of ${N} years available). The property returned ${pc(iU)} without a loan, so it ${iU>dep?"beat":"trailed"} deposits.`]);
+if(on&&L)notes.push([iU<rt*12?"bad":"ok",`The loan costs ${(rt*1200).toFixed(1)}% a year and the property earned about ${pc(iU)} without it, so the loan ${iU<rt*12?"lowered":"raised"} your return.`]);
+const miss=rows.slice(1).filter(r=>r.src=="carried"||r.src=="fallback").map(r=>r.y);
+if(miss.length)notes.push(["",`No World Bank inflation yet for ${miss.join(", ")}. Earlier values were carried forward. Update them when published.`]);
+const h=(t,a,b)=>`<div><small>${t}</small><div class="big">${pc(a)}</div><small>${pc(b)} after inflation</small></div>`;
+$("out").innerHTML=`<div class="hero">${h("Return without a loan",iU,rU)}${on&&L?h("Return on your cash, with loan",iL,rL):`<div><small>With a loan</small><div class="big">–</div><small>Switch on a loan to compare</small></div>`}</div>
+<div class="grid"><div class="m"><span>Total cash put in</span><b>${mo(inv)}</b></div><div class="m"><span>Net gain, nominal</span><b>${mo(sum(U))}</b></div><div class="m"><span>Net gain, purchase-year money</span><b>${mo(sum(re(U)))}</b></div><div class="m"><span>Total inflation over the period</span><b>${pc(D[N]-1)}</b></div>${isFinite(dep)?`<div class="m"><span>Average deposit rate</span><b>${pc(dep)}</b></div>`:""}${on&&L?`<div class="m"><span>Your cash with loan</span><b>${mo(invL)}</b></div><div class="m"><span>Loan balance at exit</span><b>${mo(bal)}</b></div><div class="m"><span>Net gain with loan</span><b>${mo(sum(Lv))}</b></div>`:""}</div>
+${notes.map(([c,t])=>`<div class="note ${c}">${t}</div>`).join("")}
+<h2>Cash flows by year</h2><div class="sc"><table><tr><th>Year</th><th>Net income</th><th>Loan instalments</th><th>Without loan</th><th>With loan</th><th>Inflation index</th></tr>${U.map((c,t)=>`<tr><td>${rows[t].y}</td><td>${mo(net[t])}</td><td>${mo(-emi[t])}</td><td>${mo(c)}</td><td>${mo(Lv[t])}</td><td>${D[t].toFixed(3)}</td></tr>`).join("")}</table></div>`}
+document.addEventListener("input",e=>{const t=e.target;if(t.dataset.k){const r=rows[t.dataset.i];r[t.dataset.k]=parseFloat(t.value)||0;if(t.dataset.k=="inf")r.src="user"}else if(t.id=="py"||t.id=="ey")sync();else if(t.id=="rate")rateEdited=true;run()});
+$("ln").onchange=()=>{$("lnf").hidden=!$("ln").checked;run()};
+$("cty").onchange=()=>{$("cc").value=CUR[iso2[$("cty").value]]||"";rows.forEach(r=>{if(r.src!="user")r.src=""});load()};
+$("retry").onclick=load;
+$("fill").onclick=()=>{if(!rows.length)return;const r1=num("r1"),g=num("gr")/100;rows.forEach((r,i)=>{r.inc=Math.round(r1*Math.pow(1+g,i))});draw();run()};
+$("ex").onclick=()=>{$("py").value=2015;$("ey").value=2025;$("price").value=8000000;$("extra").value=600000;$("exitv").value=15000000;$("ln").checked=true;$("lnf").hidden=false;$("L").value=5000000;$("term").value=20;$("r1").value=240000;$("gr").value=5;rows=[];sync();rows.forEach((r,i)=>{r.inc=Math.round(240000*Math.pow(1.05,i));r.exp=Math.round(r.inc*.15)});draw();run()};
+$("rs").onclick=()=>{document.querySelectorAll("input").forEach(i=>{if(i.type=="checkbox")i.checked=false;else if(i.id!="cc")i.value=""});$("lnf").hidden=true;rateEdited=false;rows=[];sync();load()};
+async function init(){let list=[["IND","India","IN"],["USA","United States","US"],["GBR","United Kingdom","GB"],["ARE","United Arab Emirates","AE"],["AUS","Australia","AU"],["SGP","Singapore","SG"],["DEU","Germany","DE"]];
+try{const r=await fetch(BASE+"country?format=json&per_page=400"),j=await r.json();const l=j[1].filter(c=>c.region&&c.region.value!="Aggregates").map(c=>[c.id,c.name,c.iso2Code]).sort((a,b)=>a[1].localeCompare(b[1]));if(l.length>50)list=l}catch(e){}
+list.forEach(c=>iso2[c[0]]=c[2]);$("cty").innerHTML=list.map(c=>`<option value="${c[0]}">${c[1]}</option>`).join("");
+$("cty").value="IND";$("cc").value="INR";sync();load()}
+init();
+</script>
+</body>
+</html>
