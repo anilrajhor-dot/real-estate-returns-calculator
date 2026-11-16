@@ -59,28 +59,40 @@ footer{color:var(--mut);font-size:.78rem;margin:20px 0}
 </div>
 <script>
 //ENGINE
-const pd=s=>{s=String(s).trim().replace(/^"|"$/g,"");let m;
-if(m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))return Date.UTC(+m[1],m[2]-1,+m[3]);
-if(m=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/))return Date.UTC(+m[3],m[2]-1,+m[1]);
-if(m=s.match(/^(\d{1,2})[-\/ ]([A-Za-z]{3})[A-Za-z]*[-\/ ,]+(\d{2}|\d{4})\b/)){const i="jan feb mar apr may jun jul aug sep oct nov dec".split(" ").indexOf(m[2].toLowerCase());return i<0?NaN:Date.UTC(+m[3]<100?2000+ +m[3]:+m[3],i,+m[1])}
-return NaN};
+const MON=["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"],MNM=["January","February","March","April","May","June","July","August","September","October","November","December"];
+const isLeap=y=>(y%4==0&&y%100!=0)||y%400==0,dimOf=(y,m)=>[31,isLeap(y)?29:28,31,30,31,30,31,31,30,31,30,31][m-1];
+function pdx(s){s=String(s==null?"":s).trim().replace(/^"|"$/g,"");let m,y,mo,d;
+if(m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)/)){y=+m[1];mo=+m[2];d=+m[3]}
+else if(m=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})(?!\d)/)){d=+m[1];mo=+m[2];y=+m[3]}
+else if(m=s.match(/^(\d{1,2})[-\/ ]([A-Za-z]{3})[A-Za-z]*[-\/ ,]+(\d{2}|\d{4})\b/)){const i=MON.indexOf(m[2].toLowerCase());if(i<0)return{err:`Unrecognised month name "${m[2]}"`,fmt:true};d=+m[1];mo=i+1;y=+m[3]<100?2000+ +m[3]:+m[3]}
+else return{err:"Unrecognised date format (use YYYY-MM-DD, DD-MM-YYYY, DD/MM/YYYY, DD.MM.YYYY, DD-MMM-YYYY or DD-MMM-YY)"};
+const bad=t=>({err:t,fmt:true});
+if(mo<1||mo>12)return bad(`Invalid month ${mo}: months run from 1 to 12`);
+if(y<1900||y>2100)return bad(`Year ${y} is outside the accepted range 1900 to 2100`);
+if(d<1)return bad(`Invalid day ${d}: days start at 1`);
+if(d>31)return bad(`Invalid day ${d}: no month has more than 31 days`);
+const n=dimOf(y,mo);
+if(d>n)return bad(mo==2&&d==29?`29 February ${y} does not exist: ${y} is not a leap year`:`${d} ${MNM[mo-1]} ${y} does not exist: ${MNM[mo-1]} ${y} has ${n} days`);
+return{t:Date.UTC(y,mo-1,d)}}
+const pd=s=>{const r=pdx(s);return r.err?NaN:r.t};
+const dateLike=s=>{const r=pdx(s);return !r.err||!!r.fmt};
 const num0=x=>parseFloat(String(x==null?"":x).replace(/[₹$,\s"]/g,""));
 function parseCSV(x){const out={rows:[],bad:0,errs:[],dups:0,conf:0,cols:{},warn:[],gaps:[]};x=String(x);
 if(/<html|<!doctype/i.test(x.slice(0,300))){out.errs.push({line:1,reason:"This looks like a web page, not a CSV file"});return out}
 const L=[];x.replace(/^\uFEFF/,"").split(/\r?\n/).forEach((l,i)=>{const t=l.replace(/"([^"]*)"/g,(m,a)=>a.replace(/,/g,""));if(t.trim())L.push([i+1,t])});
 if(!L.length){out.errs.push({line:0,reason:"File is empty"});return out}
 const first=L[0][1],d=first.includes("\t")?"\t":first.split(";").length>first.split(",").length?";":",",sp=l=>l.split(d).map(c=>c.trim().replace(/^"|"$/g,""));
-const h=sp(first);let st=0,dc=-1,pi=-1,vc=-1,adj=false;const hdr=h.every(c=>isNaN(pd(c)))&&h.some(c=>/[a-z]/i.test(c));
+const h=sp(first);let st=0,dc=-1,pi=-1,vc=-1,adj=false;const hdr=h.every(c=>!dateLike(c))&&h.some(c=>/[a-z]/i.test(c));
 if(hdr){st=1;dc=h.findIndex(c=>/date|day|time/i.test(c));
 for(const[re,a]of[[/adj.*close|close.*adj/i,1],[/^close(\s*price)?$|^closing(\s*price)?$/i,0],[/total\s*returns?\s*index|^tri$/i,0],[/\bnav\b|net asset/i,0],[/^price$|^ltp$|^value$|last\s*price/i,0]]){const i=h.findIndex((c,k)=>k!=dc&&re.test(c)&&!/prev|open|high|low|volume|yield/i.test(c));if(i>=0){pi=i;adj=!!a;break}}
 vc=h.findIndex(c=>/dividend|distribution|payout/i.test(c)&&!/yield|%|ratio|date/i.test(c));
-if(dc<0&&L[1]){dc=sp(L[1][1]).findIndex(c=>!isNaN(pd(c)))}}
-else{const c0=sp(first);dc=c0.findIndex(c=>!isNaN(pd(c)));pi=c0.findIndex((c,k)=>k!=dc&&num0(c)>0)}
+if(dc<0&&L[1]){dc=sp(L[1][1]).findIndex(c=>dateLike(c))}}
+else{const c0=sp(first);dc=c0.findIndex(c=>dateLike(c));pi=c0.findIndex((c,k)=>k!=dc&&num0(c)>0)}
 if(dc<0){out.errs.push({line:1,reason:"No Date column found"});return out}
 if(pi<0){out.errs.push({line:1,reason:"No price column found. Needs Close, Adj Close, NAV, Price or Total Return Index. A dividends-only file cannot be used."});return out}
 const m=new Map(),lim=Date.now()+864e5;
-L.slice(st).forEach(([ln,l])=>{const c=sp(l),t=pd(c[dc]),p=num0(c[pi]);let why="",v=0;
-if(isNaN(t))why="Invalid date";else if(t>lim)why="Date is in the future";else if(!(p>0))why=isNaN(p)?"Price is missing or not a number":"Price must be above zero";
+L.slice(st).forEach(([ln,l])=>{const c=sp(l),dr=pdx(c[dc]),t=dr.err?NaN:dr.t,p=num0(c[pi]);let why="",v=0;
+if(dr.err)why="Invalid date: "+dr.err;else if(t>lim)why="Date is in the future";else if(!(p>0))why=isNaN(p)?"Price is missing or not a number":"Price must be above zero";
 if(!why&&vc>=0&&!adj&&c[vc]!==""&&c[vc]!=null&&c[vc]!=="-"){v=num0(c[vc]);if(isNaN(v)||v<0)why="Dividend is not a valid non-negative number"}
 if(why){out.bad++;if(out.errs.length<200)out.errs.push({line:ln,reason:why,text:l.slice(0,80)});return}
 if(m.has(t)){out.dups++;if(Math.abs(m.get(t)[1]-p)>1e-9)out.conf++}m.set(t,[t,p,v>0?v:0])});
@@ -306,6 +318,35 @@ ok("Chart x-position follows calendar months: a 4-month gap is 4x one month apar
 ok("Chart runs split at missing months; gaps report how many months are missing",(()=>{const g=chartRuns([0,1,2,6,7,9]);return g.runs.length==3&&g.gaps.length==2&&g.gaps[0].missing==3&&g.gaps[1].missing==1&&JSON.stringify(g.runs[0])=="[0,1,2]"})());
 ok("Consecutive months give one run and no gaps",chartRuns([3,4,5,6]).gaps.length==0&&chartRuns([3,4,5,6]).runs.length==1);
 ok("stats() returns month indices so a chart can place missing months correctly",(()=>{const g=[...Array(14)].map((_,i)=>[Date.UTC(2020,i,15),100+i,0]).filter((_,i)=>![5,6].includes(i)),r=stats(g,Date.UTC(2020,0,1),Date.UTC(2021,1,28),ST({}));return r.mi.length==r.m.length&&r.mi[5]-r.mi[4]==3})());
+const U2=(y,m,d)=>Date.UTC(y,m-1,d),okd=(t,y,m,d)=>{const r=pdx(t);return !r.err&&r.t===U2(y,m,d)},nod=(t,re)=>{const r=pdx(t);return !!r.err&&(!re||re.test(r.err))};
+ok("Valid 29 February in leap years is accepted: 2020, 2024, and 2000 (divisible by 400)",okd("2020-02-29",2020,2,29)&&okd("29-02-2024",2024,2,29)&&okd("29/02/2000",2000,2,29)&&okd("29.02.2020",2020,2,29)&&okd("29-Feb-2024",2024,2,29)&&okd("29-Feb-24",2024,2,29));
+ok("Invalid 29 February in non-leap years is rejected in every format (2023, 2021, and 1900/2100 which are not leap years)",["2023-02-29","29-02-2023","29/02/2023","29.02.2023","29-Feb-2023","29-Feb-23","2021-02-29","1900-02-29","29-02-2100"].every(t=>nod(t,/29 February \d+ does not exist: \d+ is not a leap year/)));
+ok("31 February is rejected (never converted to 3 March)",nod("2023-02-31",/31 February 2023 does not exist: February 2023 has 28 days/)&&nod("31-02-2024",/February 2024 has 29 days/)&&nod("31-Feb-2023")&&nod("30-02-2024",/30 February 2024 does not exist/));
+ok("32 January is rejected",nod("2023-01-32",/Invalid day 32: no month has more than 31 days/)&&nod("32-01-2023",/Invalid day 32/)&&nod("32/01/2023")&&nod("32.01.2023")&&nod("32-Jan-2023")&&nod("32-Jan-23"));
+ok("Month 13 and month 0 are rejected",nod("2023-13-01",/Invalid month 13: months run from 1 to 12/)&&nod("01-13-2023",/Invalid month 13/)&&nod("15/13/2023")&&nod("15.13.2023")&&nod("2023-00-10",/Invalid month 0/));
+ok("Day 0 is rejected",nod("2023-05-00",/Invalid day 0/)&&nod("00-05-2023",/Invalid day 0/));
+ok("31 in a 30-day month is rejected: April, June, September, November",["2023-04-31","2023-06-31","2023-09-31","2023-11-31"].every(t=>nod(t,/31 \w+ 2023 does not exist: \w+ 2023 has 30 days/)));
+const MEND=[[1,31],[2,28],[3,31],[4,30],[5,31],[6,30],[7,31],[8,31],[9,30],[10,31],[11,30],[12,31]],p2=n=>String(n).padStart(2,"0");
+ok("Every valid month-end in a non-leap year (2023) is accepted, and the day after is rejected",MEND.every(([m,d])=>okd(`2023-${p2(m)}-${p2(d)}`,2023,m,d)&&nod(`2023-${p2(m)}-${p2(d+1)}`)||(m==12&&okd("2023-12-31",2023,12,31))));
+ok("Valid month-ends in a leap year (2024): 29 February accepted, 30 February rejected",MEND.every(([m,d])=>okd(`2024-${p2(m)}-${p2(m==2?29:d)}`,2024,m,m==2?29:d))&&nod("2024-02-30"));
+const FM=[["2024-02-29",2024,2,29],["29-02-2024",2024,2,29],["29/02/2024",2024,2,29],["29.02.2024",2024,2,29],["29-Feb-2024",2024,2,29],["29-Feb-24",2024,2,29],["29-February-2024",2024,2,29],["31-12-2023",2023,12,31],["31/12/2023",2023,12,31],["31.12.2023",2023,12,31],["31-Dec-2023",2023,12,31],["31-Dec-23",2023,12,31],["2023-12-31",2023,12,31],["2023-1-5",2023,1,5],["5-1-2023",2023,1,5],["05-Jan-2023",2023,1,5],["2023-01-05T00:00:00",2023,1,5],["2023-01-05 09:15:00",2023,1,5]];
+ok("All supported formats parse to the same calendar day (ISO, DD-MM-YYYY, DD/MM/YYYY, DD.MM.YYYY, DD-MMM-YYYY, DD-MMM-YY)",FM.every(([t,y,m,d])=>okd(t,y,m,d)),FM.filter(([t,y,m,d])=>!okd(t,y,m,d)).map(x=>x[0]).join());
+ok("An unrecognised format or month name is rejected with a reason",nod("not a date",/Unrecognised date format/)&&nod("12 Foo 2023",/Unrecognised month name "Foo"/)&&nod("",/Unrecognised/)&&nod("2023/13/45")&&nod("1899-12-31",/outside the accepted range/)&&nod("2101-01-01",/outside the accepted range/));
+ok("pd() returns NaN (never a shifted date) for every impossible date",["2023-02-31","31-04-2024","2023-13-01","2023-01-32","29-02-2023"].every(t=>isNaN(pd(t)))&&pd("2024-02-29")===U2(2024,2,29));
+const bad=parseCSV("Date,Close\n2024-01-31,100\n2024-02-31,101\n2024-02-29,102\n29/02/2023,103\n2024-03-01,104\n2024-13-01,105\n2024-01-32,106\n31-Apr-24,107");
+ok("CSV: only the 3 real dates are kept; the 5 impossible dates are rejected",bad.rows.length==3&&bad.bad==5&&bad.rows[0][0]==U2(2024,1,31)&&bad.rows[1][0]==U2(2024,2,29)&&bad.rows[2][0]==U2(2024,3,1));
+ok("CSV rejection report gives the original line number and a clear reason for each invalid date",bad.errs.map(e=>e.line).join()=="3,5,7,8,9"&&/^Invalid date: 31 February 2024 does not exist/.test(bad.errs[0].reason)&&/29 February 2023 does not exist: 2023 is not a leap year/.test(bad.errs[1].reason)&&/Invalid month 13/.test(bad.errs[2].reason)&&/Invalid day 32/.test(bad.errs[3].reason)&&/31 April 2024 does not exist/.test(bad.errs[4].reason),bad.errs.map(e=>e.line+":"+e.reason.slice(0,40)).join(" | "));
+ok("Invalid dates are not silently converted: none of the shifted dates (2 Mar 2024, 1 Mar 2023, 1 Jan 2025, 1 Feb 2024, 1 May 2024) appear in the data",!bad.rows.some(r=>[U2(2024,3,2),U2(2023,3,1),U2(2025,1,1),U2(2024,2,1),U2(2024,5,1)].includes(r[0])));
+const base=Array.from({length:500},(_,i)=>{const d=new Date(U2(2023,1,1)+i*864e5).toISOString().slice(0,10);return d+","+(100+i*.1).toFixed(2)}),dirty=[...base];dirty.splice(40,0,"2023-02-31,99999");dirty.splice(200,0,"31-06-2023,0.01");dirty.splice(300,0,"2023-13-01,55555");
+const cA=parseCSV("Date,Close\n"+base.join("\n")),cB=parseCSV("Date,Close\n"+dirty.join("\n")),sA=stats(cA.rows,cA.rows[0][0],cA.rows[cA.rows.length-1][0],ST({slab:0,steq:0,lteq:0})),sB=stats(cB.rows,cB.rows[0][0],cB.rows[cB.rows.length-1][0],ST({slab:0,steq:0,lteq:0}));
+ok("Invalid dates do not enter the data: same rows and same dates with or without the bad lines",cB.bad==3&&cB.rows.length==cA.rows.length&&cB.rows.every((r,i)=>r[0]==cA.rows[i][0]&&r[1]==cA.rows[i][1]));
+ok("Invalid dates do not affect calculations: identical final value, CAGR, XIRR, volatility, drawdown",sA.final==sB.final&&sA.pc==sB.pc&&sA.xa==sB.xa&&(sA.vol===sB.vol||(isNaN(sA.vol)&&isNaN(sB.vol)))&&sA.mdd==sB.mdd&&sA.maxGap==sB.maxGap);
+ok("Invalid dates do not affect SIP or the duplicate-date count (no 31 Feb collapsing onto another day)",(()=>{const a=sip(cA.rows,cA.rows[0][0],cA.rows[cA.rows.length-1][0],1000,0,0,{carry:true}),b=sip(cB.rows,cB.rows[0][0],cB.rows[cB.rows.length-1][0],1000,0,0,{carry:true});return a.inv==b.inv&&a.val==b.val&&a.done==b.done&&cB.dups==0})());
+const hl=parseCSV("31-Feb-2023,100\n01-Mar-2023,101\n02-Mar-2023,102");
+ok("A headerless file whose first row has an impossible date is not mistaken for a header",hl.rows.length==2&&hl.bad==1&&hl.errs[0].line==1&&/does not exist/.test(hl.errs[0].reason));
+const mr=mfRows({meta:{scheme_code:1,scheme_name:"X"},data:[{date:"31-02-2021",nav:"10"},{date:"01-03-2021",nav:"11"},{date:"02-03-2021",nav:"12"},{date:"29-02-2023",nav:"13"}]});
+ok("Mutual fund NAV history with impossible dates drops them and counts them as bad",mr.rows.length==2&&mr.bad==2&&mr.rows[0][0]==U2(2021,3,1));
+ok("A file where every date is impossible is rejected and imports nothing",(p=>p.rows.length==0&&p.bad==3)(parseCSV("Date,Close\n2023-02-30,1\n2023-04-31,2\n2023-00-10,3")));
 }
 }
 return T}
@@ -455,8 +496,8 @@ chk(/^\d{4}-\d\d-\d\d$/.test(p.date0),"Enter the purchase date.");
 chk(p.vac>=0&&p.vac<=100,"Vacancy must be 0 to 100%.");chk(p.ltv>=0&&p.ltv<=95,"Loan-to-value must be 0 to 95%.");chk(p.slab>=0&&p.slab<=45,"Tax slab must be 0 to 45%.");
 if(p.preA>0)chk(Number.isInteger(p.preY)&&p.preY>=1&&p.preY<=p.N,"Part-payment year must be a whole year within the holding period.");
 if(p.ltv>0)chk(p.term>=1&&p.rate>=0,"Loan needs a term of at least 1 year and a rate of 0 or more.");
-if(!er.length){p.d0=new Date(p.date0+"T00:00:00Z");chk(!isNaN(p.d0),"Purchase date is not valid.");
-p.saleD=null;if(p.sdate){const sd=new Date(p.sdate+"T00:00:00Z");chk(/^\d{4}-\d\d-\d\d$/.test(p.sdate)&&!isNaN(sd),"Planned sale date is not valid.");chk(sd>p.d0,"Planned sale date must be after the purchase date.");p.saleD=sd}
+if(!er.length){const dd0=pdx(p.date0);p.d0=new Date(dd0.err?NaN:dd0.t);chk(!dd0.err,"Purchase date is not valid"+(dd0.err?": "+dd0.err:"")+".");
+p.saleD=null;if(p.sdate){const q=pdx(p.sdate),sd=new Date(q.err?NaN:q.t);chk(/^\d{4}-\d\d-\d\d$/.test(p.sdate)&&!q.err,"Planned sale date is not valid"+(q.err?": "+q.err:"")+".");if(!q.err)chk(sd>p.d0,"Planned sale date must be after the purchase date.");p.saleD=sd}
 p.inf=[];p.src=[];for(let t=1;t<=p.N;t++){const y=p.d0.getUTCFullYear()+t;if(W.inf[y]!=null){p.inf.push(W.inf[y]);p.src.push("Actual")}else{p.inf.push(p.infA);p.src.push(ed.has("infA")?"Your assumption":"Estimate")}}}
 return{p,er}}
 const T=(h,r,cls)=>`<div class="sc"><table><tr>${h.map(x=>`<th>${x}</th>`).join("")}</tr>${r.map(x=>`<tr>${x.map((c,i)=>Array.isArray(c)?`<td class="${c[1]}">${c[0]}</td>`:`<td${cls&&cls[i]?` class="${cls[i]}"`:""}>${c}</td>`).join("")}</tr>`).join("")}</table></div>`;
@@ -497,7 +538,7 @@ if(req.method!="GET"||!u.pathname.startsWith("/mfapi/"))return new Response("Not
 const t="https://api.mfapi.in/"+u.pathname.slice(7)+u.search,c=caches.default;let r=await c.match(t);
 if(!r){r=await fetch(t);r=new Response(r.body,r);r.headers.set("Cache-Control","public, max-age=21600");await c.put(t,r.clone())}
 const o=new Response(r.body,r);o.headers.set("Access-Control-Allow-Origin","*");return o}}`;
-$("ma").innerHTML=`<h2>Multi-asset comparison</h2><p class="hint">Mutual fund NAVs load from mfapi.in, a third-party service that republishes AMFI data. They are not fetched from AMFI directly. Everything else is imported from CSV files you download: a Date column, a Close, Price or NAV column, and an optional Dividend column. The tool never invents market prices. Dates like 31-01-2021 are read day first.</p>
+$("ma").innerHTML=`<h2>Multi-asset comparison</h2><p class="hint">Mutual fund NAVs load from mfapi.in, a third-party service that republishes AMFI data. They are not fetched from AMFI directly. Everything else is imported from CSV files you download: a Date column, a Close, Price or NAV column, and an optional Dividend column. The tool never invents market prices. Dates like 31-01-2021 are read day first. Every date is checked as a real calendar date: impossible dates such as 31 February are rejected with their line number, never converted to another date.</p>
 <div id="mas"></div>
 <label for="maF">Add price history files (CSV)</label><input id="maF" type="file" accept=".csv,.txt,text/csv" multiple><div id="maM" class="hint"></div><div id="mapv"></div><div id="mal"></div>
 <div class="f"><fieldset><legend>Mutual fund NAV via mfapi.in</legend><p class="hint">Provider: mfapi.in, a third-party service, not AMFI. If it is unavailable, import the NAV history as a CSV file instead. The scheme code and exact scheme name returned must match your selection.</p><label for="maQ">Search fund name</label><input id="maQ" placeholder="e.g. HDFC Top 100 Direct Growth"><button id="maSb" type="button">Search</button><div id="maQR"></div>
@@ -522,7 +563,7 @@ const rows=[...wb,["Mutual fund NAV via mfapi.in","Third-party service that repu
 $("mas").innerHTML="<h3>Data sources with historical data</h3>"+T(["Source","Access method","Data period","Last updated","Status","Notes"],rows)+'<details><summary class="hint">Sources with no automatic historical data (import a CSV instead)</summary><p class="hint">NSE Indices price and total return indices (niftyindices.com): no documented public API. NSE and BSE share prices, IBJA gold prices, RBI DBIE deposit rates, lending rates and government securities yields, and MoSPI inflation: no verified public API found. Download the history yourself, save it as CSV and import it above. Until then these are not used. World Bank inflation and your own rates stand in for the RBI and MoSPI series.</p></details>'}
 function renderList(){renderSrc();$("mal").innerHTML=AS.length?AS.map((a,i)=>`<div class="r2"><input value="${esc(a.n)}" data-i="${i}" data-f="n" aria-label="Asset name"><select data-i="${i}" data-f="kind" aria-label="Data type">${Object.entries(KD).map(([k,v])=>`<option value="${k}"${a.kind==k?" selected":""}>${v}</option>`).join("")}</select><select data-i="${i}" data-f="c" aria-label="Tax class"><option value="eq"${a.c=="eq"?" selected":""}>Taxed as equity</option><option value="gold"${a.c=="gold"?" selected":""}>Taxed as gold</option><option value="debt"${a.c=="debt"?" selected":""}>Taxed at slab rate</option></select><span class="hint">${a.src=="mfapi"?`Provider: mfapi.in (third-party service, not AMFI directly). Scheme code ${esc(a.code)}. Retrieved ${fD(a.t||0)}. Status ${stOf(a)}.`:`Imported CSV, status ${stOf(a)}, imported ${fD(a.t||0)}.`} ${fD(a.r[0][0])} to ${fD(a.r[a.r.length-1][0])}, ${a.r.length} rows${a.bad?", "+a.bad+" rejected":""}${a.dups?", "+a.dups+" duplicate dates":""}. Return basis: ${esc(cls(a).txt)}${a.kind=="mf"?" (plan: "+(a.plan||mfPlan(a.n))+")":""}${(a.warn||[]).length?", "+a.warn.length+" warning(s) in the Excel report":""}</span>${a.src=="mfapi"?`<button class="g" data-rf="${i}" type="button">Refresh</button>`:""}<button class="g" data-rm="${i}" type="button">Remove</button></div>`).join(""):'<p class="hint">No assets yet. The FD and bond rows below use your own rates.</p>'}
 function renderTable(){const f=id=>parseFloat($(id).value),box=$("mar"),ends=AS.map(a=>a.r[a.r.length-1][0]);let t0,t1;
-if($("maP").value=="c"){t0=Date.parse($("maS").value);t1=Date.parse($("maE").value)}else{t1=AS.length?Math.min(...ends):Date.parse(new Date().toISOString().slice(0,10));const d=new Date(t1);d.setUTCFullYear(d.getUTCFullYear()-$("maP").value);t0=d.getTime()}
+if($("maP").value=="c"){t0=(x=>x.err?NaN:x.t)(pdx($("maS").value));t1=(x=>x.err?NaN:x.t)(pdx($("maE").value))}else{t1=AS.length?Math.min(...ends):Date.parse(new Date().toISOString().slice(0,10));const d=new Date(t1);d.setUTCFullYear(d.getUTCFullYear()-$("maP").value);t0=d.getTime()}
 const o={amt:f("maA"),cin:f("maCI"),cout:f("maCO"),slab:num("slab"),steq:f("maT1"),lteq:f("maT2"),ltoth:f("maT3"),reinv:$("maR").value=="r",inf:y=>W.inf[y]!=null?W.inf[y]:(num("infA")||0)},sa=f("maSP");
 if(!(o.amt>0&&sa>=0&&t1>t0&&[o.cin,o.cout,o.steq,o.lteq,o.ltoth,o.slab].every(x=>isFinite(x)&&x>=0))){box.innerHTML='<div class="note bad">Check the amounts, the period dates and the rates. All must be valid numbers, with the end date after the start date.</div>';LASTMA=null;return}
 const yrs=(t1-t0)/864e5/365,D=defl(t0,t1,o.inf);let est=0;for(let y=new Date(t0).getUTCFullYear();y<=new Date(t1).getUTCFullYear();y++)if(W.inf[y]==null)est++;
