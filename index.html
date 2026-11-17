@@ -52,6 +52,7 @@ footer{color:var(--mut);font-size:.78rem;margin:20px 0}
 <div id="dv"></div>
 <div id="inp" class="f" style="margin-top:12px"></div>
 <div id="err"></div>
+<div id="ins"></div>
 <div id="out" aria-live="polite"></div>
 <div id="ma"></div>
 <div id="btns" hidden><button id="pdf" type="button">Save as PDF</button><button class="g" id="xls" type="button">Download Excel (.xlsx)</button></div>
@@ -116,6 +117,16 @@ const infDefault=inf=>{const k=Object.keys(inf||{}).map(Number).sort((a,b)=>b-a)
 const inflField=(edited,cur,sug)=>edited||sug==null?cur:sug.toFixed(2);
 const chartX=(k,a,b,pad,wid)=>pad+(k-a)/((b-a)||1)*(wid-2*pad);
 function chartRuns(mi){const runs=[[0]],gaps=[];for(let i=1;i<mi.length;i++){if(mi[i]-mi[i-1]==1)runs[runs.length-1].push(i);else{gaps.push({a:i-1,b:i,missing:mi[i]-mi[i-1]-1});runs.push([i])}}return{runs,gaps}}
+const infSrcLabel=st=>({LIVE:"Actual: World Bank (live)",CACHED:"Cached World Bank","BUILT-IN":"Built-in historical"})[st]||"World Bank (status unknown)";
+function holdingInflation(d0,N,inf,assumed,lbl,userEd){const out=[],a=new Date(d0);
+for(let t=1;t<=N;t++){const s0=addMonths(a,12*(t-1)),e0=addMonths(a,12*t);let f=1,have=0,tot=0;const parts=[];
+for(let y=s0.getUTCFullYear();y<=e0.getUTCFullYear();y++){const ys=Date.UTC(y,0,1),ye=Date.UTC(y+1,0,1),from=Math.max(s0.getTime(),ys),to=Math.min(e0.getTime(),ye);if(to<=from)continue;
+const w=(to-from)/(ye-ys),has=inf&&inf[y]!=null,r=has?inf[y]:assumed;f*=Math.pow(1+r/100,w);parts.push({y,w,r,actual:!!has});tot+=w;if(has)have+=w}
+const basis=have/tot>.999?lbl:have==0?(userEd?"Your assumption":"Estimated (no data yet)"):lbl+" + "+(userEd?"your assumption":"estimate");
+out.push({t,from:s0,to:e0,rate:+((f-1)*100).toFixed(9),basis,parts})}
+return out}
+const infOnCountry=(edited,hasData)=>hasData?(edited?"prompt":"apply"):(edited?"warn-keep":"default");
+function latestOnly(fn){let seq=0;return async(...a)=>{const my=++seq,r=await fn(...a);return my===seq?{stale:false,r}:{stale:true}}}
 function volOf(m,mi){const n=m.length-1;if(n<12)return{v:NaN,note:"unavailable: fewer than 12 monthly intervals"};const k=mi.slice(1).map((x,i)=>x-mi[i]),miss=k.reduce((a,b)=>a+b-1,0);
 if(!miss){const rr=m.slice(1).map((x,i)=>x/m[i]-1),mu=rr.reduce((a,b)=>a+b,0)/n;return{v:Math.sqrt(rr.reduce((a,b)=>a+(b-mu)**2,0)/(n-1))*Math.sqrt(12),note:"consecutive monthly observations"}}
 if(miss>n/3)return{v:NaN,note:`unavailable: ${miss} missing month(s) between ${n+1} observations`};
@@ -318,6 +329,31 @@ ok("Chart x-position follows calendar months: a 4-month gap is 4x one month apar
 ok("Chart runs split at missing months; gaps report how many months are missing",(()=>{const g=chartRuns([0,1,2,6,7,9]);return g.runs.length==3&&g.gaps.length==2&&g.gaps[0].missing==3&&g.gaps[1].missing==1&&JSON.stringify(g.runs[0])=="[0,1,2]"})());
 ok("Consecutive months give one run and no gaps",chartRuns([3,4,5,6]).gaps.length==0&&chartRuns([3,4,5,6]).runs.length==1);
 ok("stats() returns month indices so a chart can place missing months correctly",(()=>{const g=[...Array(14)].map((_,i)=>[Date.UTC(2020,i,15),100+i,0]).filter((_,i)=>![5,6].includes(i)),r=stats(g,Date.UTC(2020,0,1),Date.UTC(2021,1,28),ST({}));return r.mi.length==r.m.length&&r.mi[5]-r.mi[4]==3})());
+{
+const IN={2022:6.7,2023:5.65,2024:4.95,2025:2.4},US={2022:8,2023:4.1,2024:3,2025:2.9},LV=infSrcLabel("LIVE"),dd=(y,m,d)=>new Date(Date.UTC(y,m-1,d)),rt=h=>h.map(x=>+x.rate.toFixed(6));
+const h22=holdingInflation(dd(2022,1,1),3,IN,5,LV,false);
+ok("Purchase 1 Jan 2022, 3 years: selects exactly the calendar years 2022, 2023, 2024",JSON.stringify(rt(h22))==JSON.stringify([6.7,5.65,4.95])&&h22.every((x,i)=>x.parts.length==1&&x.parts[0].y==2022+i&&x.basis==LV));
+const h23=holdingInflation(dd(2023,1,1),3,IN,5,LV,false),h24=holdingInflation(dd(2024,1,1),3,IN,5,LV,false);
+ok("Changing the purchase year to 2023 selects 2023, 2024, 2025 (the correct observations for the revised period)",JSON.stringify(rt(h23))==JSON.stringify([5.65,4.95,2.4])&&h23.map(x=>x.parts[0].y).join()=="2023,2024,2025");
+ok("Changing to 2024: 2024 and 2025 are actual; 2026 has no data and is labelled as an estimate at the assumed 5%",JSON.stringify(rt(h24))==JSON.stringify([4.95,2.4,5])&&h24[2].basis=="Estimated (no data yet)"&&h24[0].basis==LV);
+const hu=holdingInflation(dd(2022,1,1),3,IN,5,LV,false),hs=holdingInflation(dd(2022,1,1),3,US,5,LV,false);
+ok("Changing country India to United States changes the inflation series when the source data differs",JSON.stringify(rt(hu))!=JSON.stringify(rt(hs))&&JSON.stringify(rt(hs))==JSON.stringify([8,4.1,3])&&JSON.stringify(rt(hu))==JSON.stringify([6.7,5.65,4.95]));
+ok("No United States year ever receives an India value (no silent substitution)",hs.every(x=>x.parts.every(q=>q.r==US[q.y]))&&!hs.some((x,i)=>x.rate==hu[i].rate));
+const hm=holdingInflation(dd(2022,7,1),1,IN,5,LV,false)[0];
+ok("Mid-year purchase blends the two calendar years by days: (1.067^(184/365) x 1.0565^(181/365) - 1)",cl(hm.rate,(Math.pow(1.067,184/365)*Math.pow(1.0565,181/365)-1)*100,1e-9)&&hm.parts.map(q=>q.y).join()=="2022,2023",hm.rate.toFixed(4));
+const hp=holdingInflation(dd(2025,7,1),1,IN,5,LV,false)[0],hq=holdingInflation(dd(2025,7,1),1,IN,5,LV,true)[0];
+ok("A period partly beyond the data is labelled as mixed: actual plus estimate, or actual plus your assumption",hp.basis==LV+" + estimate"&&hq.basis==LV+" + your assumption"&&hp.parts[1].y==2026&&!hp.parts[1].actual);
+const he=holdingInflation(dd(2027,1,1),2,IN,5,LV,false),hy=holdingInflation(dd(2027,1,1),2,IN,5,LV,true);
+ok("Years with no data use exactly the assumed rate: Estimated (no data yet), or Your assumption if you entered it",he.every(x=>cl(x.rate,5,1e-9)&&x.basis=="Estimated (no data yet)")&&hy.every(x=>x.basis=="Your assumption"));
+const hn=holdingInflation(dd(2022,1,1),3,{},6.5,LV,false);
+ok("A country with no inflation data relies entirely on the assumed rate and is never given another country's data",hn.every(x=>cl(x.rate,6.5,1e-9)&&x.basis=="Estimated (no data yet)"&&x.parts.every(q=>!q.actual)));
+ok("A leap-year purchase (1 Jan 2024, 1 year) takes the 2024 rate exactly",cl(holdingInflation(dd(2024,1,1),1,IN,5,LV,false)[0].rate,4.95,1e-9));
+ok("Cached, live and built-in inflation carry different labels, distinct from assumption and estimate",new Set([infSrcLabel("LIVE"),infSrcLabel("CACHED"),infSrcLabel("BUILT-IN"),"Your assumption","Estimated (no data yet)"]).size==5&&holdingInflation(dd(2022,1,1),1,IN,5,infSrcLabel("CACHED"),false)[0].basis=="Cached World Bank"&&holdingInflation(dd(2022,1,1),1,IN,5,infSrcLabel("BUILT-IN"),false)[0].basis=="Built-in historical");
+const rIN=mk({N:3,rent:1,app:6,slab:0,ltcg:0,inf:rt(hu)}),rUS=mk({N:3,rent:1,app:6,slab:0,ltcg:0,inf:rt(hs)});
+ok("Different inflation series change real IRR, inflation-adjusted net gain and the inflation index (India higher cumulative inflation, lower real IRR)",rIN.rL<rUS.rL&&rIN.realNet<rUS.realNet&&rIN.D[3]>rUS.D[3]&&cl(rIN.D[3],1.067*1.0565*1.0495,1e-9)&&cl(rUS.D[3],1.08*1.041*1.03,1e-9));
+ok("Nominal IRR is unchanged by the inflation series (only real figures move)",cl(rIN.iL,rUS.iL,1e-12));
+ok("Country change with a manual assumption: prompt when data exist, warn when none; without manual: apply, or fall back to the model default",infOnCountry(true,true)=="prompt"&&infOnCountry(true,false)=="warn-keep"&&infOnCountry(false,true)=="apply"&&infOnCountry(false,false)=="default");
+}
 const U2=(y,m,d)=>Date.UTC(y,m-1,d),okd=(t,y,m,d)=>{const r=pdx(t);return !r.err&&r.t===U2(y,m,d)},nod=(t,re)=>{const r=pdx(t);return !!r.err&&(!re||re.test(r.err))};
 ok("Valid 29 February in leap years is accepted: 2020, 2024, and 2000 (divisible by 400)",okd("2020-02-29",2020,2,29)&&okd("29-02-2024",2024,2,29)&&okd("29/02/2000",2000,2,29)&&okd("29.02.2020",2020,2,29)&&okd("29-Feb-2024",2024,2,29)&&okd("29-Feb-24",2024,2,29));
 ok("Invalid 29 February in non-leap years is rejected in every format (2023, 2021, and 1900/2100 which are not leap years)",["2023-02-29","29-02-2023","29/02/2023","29.02.2023","29-Feb-2023","29-Feb-23","2021-02-29","1900-02-29","29-02-2100"].every(t=>nod(t,/29 February \d+ does not exist: \d+ is not a leap year/)));
@@ -431,6 +467,20 @@ w=await loadWB("XX","dep",wd(async()=>R2([{message:[{id:"120",value:"Invalid val
 w=await loadWB("IND","dep",wd(async()=>R2([{page:1},[{date:"2025",value:null}]])));ok("A valid response with no observations is UNAVAILABLE, not LIVE",w.s=="UNAVAILABLE"&&/No observations/.test(w.err));
 const fm=async u=>/CPI/.test(u)?R2(okb):R5,ws=await Promise.all(["inf","lend","dep"].map(k=>loadWB("IND",k,{...wd(fm,{dep:{d:{2021:3},t:9}}),builtin:()=>null})));
 ok("Each indicator has its own status: one failure does not make the others LIVE",ws.map(x=>x.s).join()=="LIVE,UNAVAILABLE,CACHED",ws.map(x=>x.s).join());
+{
+const flip=latestOnly(async(c,ms)=>{await sleep(ms);return c}),[rA,rB]=await Promise.all([flip("IND",40),flip("USA",5)]);
+ok("Race: a slow request for the old country (India) is stale and cannot overwrite the newly selected country",rA.stale&&!rB.stale&&rB.r=="USA");
+const [rC,rD]=await Promise.all([flip("IND",5),flip("USA",30)]);
+ok("Race: even when the old request finishes first, only the newest selection is applied",rC.stale&&!rD.stale&&rD.r=="USA");
+const rr=await Promise.all([flip("IND",30),flip("GBR",20),flip("USA",10)]);
+ok("Race: with three quick selections only the last one is applied",rr[0].stale&&rr[1].stale&&!rr[2].stale&&rr[2].r=="USA");
+const cache={IND:{inf:{d:{2024:4.95},t:7}}},dpc=fm=>({base:"https://wb/",year:2026,fetch:fm,now:()=>1,o:{wait:0},get:(c,k)=>(cache[c]&&cache[c][k])||null,set(){},builtin:(c,k)=>c=="IND"&&k=="inf"?{d:{2024:4.95},t:5}:null});
+let wi=await loadWB("USA","inf",dpc(async()=>R5));
+ok("A failed United States request never falls back to India's cached or built-in inflation",wi.s=="UNAVAILABLE"&&!Object.keys(wi.d).length);
+wi=await loadWB("IND","inf",dpc(async()=>R5));ok("India still falls back to its own cached data",wi.s=="CACHED"&&wi.d[2024]==4.95);
+let seen="";await loadWB("USA","inf",dpc(async u=>{seen=u;return R2(okb)}));
+ok("The request carries the selected country code and the inflation indicator",/country\/USA\/indicator\/FP\.CPI\.TOTL\.ZG/.test(seen));
+}
 return T}
 //ENDENGINE
 //XLSX
@@ -467,7 +517,7 @@ $("date0").value=new Date().toISOString().slice(0,10);
 const fmt=x=>(x<0?"-":"")+"₹"+Math.abs(Math.round(x)).toLocaleString("en-IN"),pc=x=>isFinite(x)?(x*100).toFixed(2)+"%":"n/a",num=id=>parseFloat($(id).value);
 const FB={IND:{inf:{1990:8.97,1991:13.87,1992:11.79,1993:6.33,1994:10.25,1995:10.22,1996:8.98,1997:7.16,1998:13.23,1999:4.67,2000:4.01,2001:3.78,2002:4.30,2003:3.81,2004:3.77,2005:4.25,2006:5.80,2007:6.37,2008:8.35,2009:10.88,2010:11.99,2011:8.91,2012:9.48,2013:10.02,2014:6.67,2015:4.91,2016:4.95,2017:3.33,2018:3.94,2019:3.73,2020:6.62,2021:5.13,2022:6.70,2023:5.65,2024:4.95,2025:2.40},lend:{},dep:{}}};
 const WBU="https://api.worldbank.org/v2/",IND={inf:"FP.CPI.TOTL.ZG",lend:"FR.INR.LEND",dep:"FR.INR.DPST"},YR=new Date().getFullYear();
-const ed=new Set(),ap={};let sugInf=null;let W={inf:{},lend:{},dep:{},st:{}},iso2={},LAST=null;
+const ed=new Set(),ap={},cname={};let sugInf=null,infPrompt=null;let W={inf:{},lend:{},dep:{},st:{}},iso2={},LAST=null;
 const ls=(k,v)=>{try{if(v===undefined)return JSON.parse(localStorage.getItem(k));localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}};
 const st=(t,c)=>{$("st").textContent=t;$("st").className=c||""};
 const latest=o=>{const k=Object.keys(o||{}).map(Number).sort((a,b)=>b-a)[0];return k?[k,o[k]]:null};
@@ -476,15 +526,19 @@ get:(c,k)=>{const r=(ls("wbc")||{})[c];let v=r&&r[k];if(v&&v.d)return v;if(v&&ty
 set:(c,k,v)=>{const m=ls("wbc")||{};m[c]=m[c]||{};m[c][k]=v;ls("wbc",m)},
 builtin:(c,k)=>k=="inf"&&FB[c]?{d:FB[c].inf,t:Date.UTC(2026,10,15)}:null});
 function infHint(){const e=ed.has("infA"),n=Math.min(5,Object.keys(W.inf||{}).length),sv=W.st&&W.st.inf?W.st.inf.s:"UNAVAILABLE";$("tI").textContent=e?"User-edited":"Estimate";
-$("hI").innerHTML=(sugInf!=null?`Suggested default: ${sugInf.toFixed(2)}% (average of the last ${n} World Bank inflation years, status ${sv}). `:"No World Bank inflation data to suggest a default. ")+(e?"Your own value is in use and is kept when data reloads or the country changes. "+(sugInf!=null?'<button class="g" type="button" data-ri="1">Restore suggested default</button> ':""):"Applied because you have not edited this field. ")+"Actual World Bank inflation is used for every year it covers. Your assumption applies only to later years."}
-async function load(){const c=$("cty").value;st("Loading World Bank data…");const K=["inf","lend","dep"],R=await Promise.all(K.map(k=>loadWB(c,k,wdeps())));
-W={inf:R[0].d,lend:R[1].d,dep:R[2].d,st:{inf:R[0],lend:R[1],dep:R[2]}};
+$("hI").innerHTML=(sugInf!=null?`Suggested default: ${sugInf.toFixed(2)}% (average of the last ${n} World Bank inflation years, status ${sv}). `:"No World Bank inflation data for "+(cname[W.cc]||"this country")+" to suggest a default. The value in use is an assumption, not data. ")+(e?"Your own value is in use and is kept when data reloads or the country changes. "+(sugInf!=null?'<button class="g" type="button" data-ri="1">Restore suggested default</button> ':""):"Applied because you have not edited this field. ")+"Actual World Bank inflation is used for every year it covers. Your assumption applies only to later years."}
+const loadCountry=latestOnly(async c=>Promise.all(["inf","lend","dep"].map(k=>loadWB(c,k,wdeps()))));
+async function load(fromChange){const c=$("cty").value;st("Loading World Bank data for "+(cname[c]||c)+"…");const o=await loadCountry(c);if(o.stale)return;const R=o.r;
+W={cc:c,inf:R[0].d,lend:R[1].d,dep:R[2].d,st:{inf:R[0],lend:R[1],dep:R[2]}};
 const lb=["Inflation","Lending rate","Deposit rate"],li=latest(W.inf),ll=latest(W.lend),ld=latest(W.dep);
-st(R.map((r,i)=>{const l=latest(r.d);return lb[i]+" "+r.s+(l?" ("+l[0]+")":"")}).join("; ")+(li?". Years after "+li[0]+" use your assumed inflation rate.":". Enter an assumed inflation rate."),R.every(r=>r.s=="LIVE")?"ok":R.some(r=>r.s=="UNAVAILABLE")?"err":"");
-sugInf=infDefault(W.inf);$("infA").value=inflField(ed.has("infA"),$("infA").value,sugInf);infHint();
+st((cname[c]||c)+": "+R.map((r,i)=>{const l=latest(r.d);return lb[i]+" "+r.s+(l?" ("+l[0]+")":"")}).join("; ")+(li?". Years after "+li[0]+" use your assumed inflation rate.":". No usable inflation data: an assumed rate is used."),R.every(r=>r.s=="LIVE")?"ok":R.some(r=>r.s=="UNAVAILABLE")?"err":"");
+sugInf=infDefault(W.inf);const plan=infOnCountry(ed.has("infA"),sugInf!=null);
+if(plan=="apply")$("infA").value=sugInf.toFixed(2);else if(plan=="default")$("infA").value="5.00";
+if(plan=="prompt"){if(fromChange===true)infPrompt={cc:c,name:cname[c]||c,mine:$("infA").value,sug:sugInf};else if(infPrompt&&infPrompt.cc!==c)infPrompt=null}else infPrompt=null;
+infHint();
 $("hR").innerHTML=ll?`${R[1].s}: World Bank lending rate ${ll[1].toFixed(2)}% (observation year ${ll[0]}${R[1].t?", retrieved "+fD(R[1].t):""}). A reference only, never applied automatically. <button class="g" type="button" data-ap="rate">Apply to loan rate</button> <span id="hRm"></span>`:"";
 $("hF").innerHTML=ld?`${R[2].s}: World Bank deposit rate ${ld[1].toFixed(2)}% (observation year ${ld[0]}${R[2].t?", retrieved "+fD(R[2].t):""}). A reference only, never applied automatically. <button class="g" type="button" data-ap="fd">Apply to FD rate</button> <span id="hFm"></span>`:"";
-run();renderList()}
+run();renderList();renderTable()}
 async function saveAll(){st("Downloading all countries, this may take a minute…");try{const o={};for(const i in IND){const r=await fetch(`${WBU}country/all/indicator/${IND[i]}?format=json&per_page=20000&date=1990:${YR}`),j=await r.json();(j[1]||[]).forEach(d=>{if(d.value!=null&&d.countryiso3code){o[d.countryiso3code]=o[d.countryiso3code]||{};(o[d.countryiso3code][i]=o[d.countryiso3code][i]||{})[+d.date]=+(+d.value).toFixed(3)}})}
 ls("wbAll",{t:Date.now(),d:o});st(`Saved data for ${Object.keys(o).length} countries on this device. They now work offline.`,"ok")}catch(e){st("Could not download or save. Check your connection and storage, then try again.","err")}}
 function read(){const p={},er=[];F.forEach(([g,fs])=>fs.forEach(([i])=>{p[i]=(i=="date0"||i=="sdate")?$(i).value:num(i)}));
@@ -498,7 +552,7 @@ if(p.preA>0)chk(Number.isInteger(p.preY)&&p.preY>=1&&p.preY<=p.N,"Part-payment y
 if(p.ltv>0)chk(p.term>=1&&p.rate>=0,"Loan needs a term of at least 1 year and a rate of 0 or more.");
 if(!er.length){const dd0=pdx(p.date0);p.d0=new Date(dd0.err?NaN:dd0.t);chk(!dd0.err,"Purchase date is not valid"+(dd0.err?": "+dd0.err:"")+".");
 p.saleD=null;if(p.sdate){const q=pdx(p.sdate),sd=new Date(q.err?NaN:q.t);chk(/^\d{4}-\d\d-\d\d$/.test(p.sdate)&&!q.err,"Planned sale date is not valid"+(q.err?": "+q.err:"")+".");if(!q.err)chk(sd>p.d0,"Planned sale date must be after the purchase date.");p.saleD=sd}
-p.inf=[];p.src=[];for(let t=1;t<=p.N;t++){const y=p.d0.getUTCFullYear()+t;if(W.inf[y]!=null){p.inf.push(W.inf[y]);p.src.push("Actual")}else{p.inf.push(p.infA);p.src.push(ed.has("infA")?"Your assumption":"Estimate")}}}
+const hi=holdingInflation(p.d0,p.N,W.inf,p.infA,infSrcLabel(W.st&&W.st.inf?W.st.inf.s:""),ed.has("infA"));p.inf=hi.map(x=>x.rate);p.src=hi.map(x=>x.basis);p.infd=hi}
 return{p,er}}
 const T=(h,r,cls)=>`<div class="sc"><table><tr>${h.map(x=>`<th>${x}</th>`).join("")}</tr>${r.map(x=>`<tr>${x.map((c,i)=>Array.isArray(c)?`<td class="${c[1]}">${c[0]}</td>`:`<td${cls&&cls[i]?` class="${cls[i]}"`:""}>${c}</td>`).join("")}</tr>`).join("")}</table></div>`;
 function chart(v,b){const e=v.map((x,i)=>x-b[i]),W=600,H=220,m=8,N=v.length-1,mx=Math.max(...v)*1.05,mn=Math.min(0,...e),X=i=>m+i*(W-2*m)/N,Y=x=>H-22-(x-mn)/(mx-mn)*(H-40),pl=(a,c)=>`<polyline fill="none" stroke="${c}" stroke-width="2.5" points="${a.map((x,i)=>X(i).toFixed(1)+","+Y(x).toFixed(1)).join(" ")}"/>`;
@@ -507,7 +561,17 @@ function dash(){const K=[["inf","Inflation","FP.CPI.TOTL.ZG"],["lend","Lending r
 rows=K.map(([k,n,code])=>{const s=(W.st&&W.st[k])||{s:"UNAVAILABLE",t:0,err:"Not loaded"},l=latest(W[k]);return[n,"World Bank "+code,l?l[1].toFixed(2)+"%":"none",l?l[0]:"-",Object.keys(W[k]||{}).length,s.t?fD(s.t):"-",c(s.s),s.s=="LIVE"?"":(s.err||"")]});
 const u=(n,id)=>{const a=ap[id];return a?[n,"World Bank "+WBC[a.k]+" (applied by you, observation year "+a.y+")",$(id).value+"%",a.y,"-",a.t?fD(a.t):"-",c(a.s),""]:[n,"Your input or model default",($(id).value||"-")+"%","-","-","-",c(ed.has(id)?"USER-EDITED":"ESTIMATED"),""]};
 $("dv").innerHTML="<h2>Data verification</h2>"+T(["Indicator","Source","Latest value","Latest observation year","Observations","Retrieved","Status","Notes"],[...rows,u("Assumed inflation after latest data","infA"),u("Loan interest rate","rate"),u("Fixed deposit rate","fd"),u("Price appreciation","app"),u("Rent growth","rg")])+'<p class="hint">Each indicator has its own status. LIVE: fetched and validated just now. CACHED: saved earlier on this device, with its original retrieval date. BUILT-IN: bundled snapshot (retrieved 15 Nov 2026), used only when a live request fails and nothing is saved. UNAVAILABLE: no valid data. ESTIMATED: a model default, not published data. USER-EDITED: changed by you.</p>'}
-function run(){dash();const{p,er}=read();$("err").innerHTML=er.map(m=>`<div class="note bad">${m}</div>`).join("");if(er.length){$("out").innerHTML="";$("btns").hidden=true;return}
+function renderIns(p){const c=W.cc||$("cty").value,nm=cname[c]||c,sel=$("cty").value,sI=(W.st&&W.st.inf)||{s:"UNAVAILABLE",t:0},has=Object.keys(W.inf||{}).length>0,li=latest(W.inf),ks=Object.keys(W.inf||{}).map(Number).sort((a,b)=>b-a).slice(0,5),avg=infDefault(W.inf),asm=$("infA").value,as=ed.has("infA")?"USER-EDITED":"ESTIMATED";
+let h="<h2>Inflation summary</h2>";
+if(sel!==c)h+=`<div class="note">Loading ${esc(cname[sel]||sel)}. The figures below still belong to ${esc(nm)} until the new data arrive.</div>`;
+if(infPrompt)h+=`<div class="note bad"><b>${esc(infPrompt.name)} selected.</b> You entered your own inflation assumption of ${esc(infPrompt.mine)}%. Keep it, or apply the suggested rate for ${esc(infPrompt.name)} (${infPrompt.sug.toFixed(2)}%, the average of its latest five World Bank years)? Until you choose, your ${esc(infPrompt.mine)}% is the rate being used.<br><button type="button" data-iq="keep">Keep my ${esc(infPrompt.mine)}%</button><button class="g" type="button" data-iq="apply">Apply ${infPrompt.sug.toFixed(2)}% for ${esc(infPrompt.name)}</button></div>`;
+if(!has)h+=`<div class="note bad">No usable World Bank inflation data for ${esc(nm)}${sI.s=="UNAVAILABLE"&&sI.err?" ("+esc(sI.err)+")":""}. The calculator is relying on an assumed rate of ${esc(asm)}% for every year (${as=="USER-EDITED"?"your own value":"the model default"}), so real IRR and inflation-adjusted figures are estimates. Nothing is borrowed from another country.</div>`;
+else if(p&&p.infd.some(x=>x.parts.some(q=>!q.actual)))h+=`<div class="note">Some holding years go beyond the latest published observation (${li[0]}). For those years the assumed rate of ${esc(asm)}% (${as=="USER-EDITED"?"your assumption":"an estimate"}) is used and labelled as such.</div>`;
+h+='<div class="grid">'+[["Country",esc(nm)+" ("+esc(c)+")"],["Source status",sI.s+(sI.t?", retrieved "+fD(sI.t):sI.s=="BUILT-IN"?", bundled snapshot":"")],["Latest available observation",li?li[0]+": "+li[1].toFixed(2)+"%":"none"],["Average of the latest five available years",avg!=null?avg.toFixed(2)+"% ("+ks.slice().sort().join(", ")+")":"n/a"],["Assumption for years without data",esc(asm)+"% ("+as+")"]].map(([a,b])=>`<div class="m"><span>${a}</span><b>${b}</b></div>`).join("")+"</div>";
+if(p)h+=T(["Holding year","Period","Calendar years and rates","Rate used","Source"],p.infd.map(x=>[x.t,fD(x.from)+" to "+fD(x.to),x.parts.map(q=>`${q.y} (${(q.w*100).toFixed(0)}%): ${q.r.toFixed(2)}%${q.actual?"":" assumed"}`).join("; "),x.rate.toFixed(2)+"%",x.basis]))+'<p class="hint">These are the annual rates used for real IRR, the inflation index and inflation-adjusted cash flows. Each holding year takes the calendar-year observations it overlaps, weighted by days. Sources: Actual: World Bank (live), Cached World Bank, Built-in historical, Your assumption, Estimated (no data yet).</p>';
+else h+='<p class="hint">Correct the input errors above to see the annual rates used.</p>';
+$("ins").innerHTML=h}
+function run(){dash();const{p,er}=read();renderIns(er.length?null:p);$("err").innerHTML=er.map(m=>`<div class="note bad">${m}</div>`).join("");if(er.length){$("out").innerHTML="";$("btns").hidden=true;return}
 const R=calc(p),loan=p.ltv>0,notes=[];LAST={p,R};
 notes.push(["",`Capital gains: sale on ${fD(R.saleDate)} after ${R.heldM} completed months, so ${R.lt?"long-term (more than 24 months)":"short-term, taxed at your slab rate (24 months or less; exactly 24 months is short-term)"}. Tax at sale is ${fmt(R.cg)} (${(R.cgr*100).toFixed(2)}% on a gain of ${fmt(Math.max(0,R.gain))}).`]);
 if(p.saleD){const dm=Math.abs((p.saleD-addMonths(p.d0,12*p.N))/864e5/30.44);if(dm>6)notes.push(["",`The planned sale date is about ${Math.round(dm)} months from the purchase date plus the ${p.N}-year holding period. Annual cash flows still use the holding period in years. The sale date only decides whether the gain is long-term or short-term.`])}
@@ -515,7 +579,7 @@ if(loan&&R.iU<p.rate/100)notes.push(["bad",`The loan costs ${p.rate}% but the pr
 if(loan&&isFinite(R.dscr)&&R.dscr<1.2)notes.push(["bad",`Year 1 income covers loan payments only ${R.dscr.toFixed(2)} times. Lenders usually want 1.2 or more.`]);
 if(R.rows[0].cf<0)notes.push(["",`Year 1 cash flow is ${fmt(R.rows[0].cf)}. You fund the shortfall yourself.`]);
 if(isNaN(R.iL))notes.push(["bad","IRR could not be found because the cash flows never change sign."]);
-const est=p.src.filter(s=>s!="Actual").length;if(est)notes.push(["",`${est} of ${p.N} inflation years use ${ed.has("infA")?"your own inflation assumption":"an estimate"}, not published World Bank data. The other ${p.N-est} use actual World Bank inflation.`]);
+const est=p.infd.filter(x=>x.parts.some(q=>!q.actual)).length;if(est)notes.push(["",`${est} of ${p.N} inflation years use ${ed.has("infA")?"your own inflation assumption":"an estimate"} (fully or partly), not published World Bank data. The other ${p.N-est} use ${(W.st&&W.st.inf?infSrcLabel(W.st.inf.s):"World Bank")} inflation.`]);
 const K=loan?R.iL:R.iU,X=loan?R.xL:R.xU,RR=loan?R.rL:R.rU;
 let h=`<div class="hero"><div><small>Return on your cash (IRR)</small><div class="big">${pc(K)}</div><small>${pc(RR)} after inflation</small></div><div><small>XIRR on annual cash flows</small><div class="big">${pc(X)}</div><small>Annual totals dated on purchase anniversaries, not monthly EMIs</small></div><div><small>Property value CAGR</small><div class="big">${pc(R.g)}</div><small>Equity multiple ${R.em.toFixed(2)}x</small></div></div>
 <div class="grid">${[["Total equity invested (initial plus later outflows)",fmt(R.inv)],["Total positive distributions",fmt(R.dist)],["Equity multiple (distributions ÷ invested)",R.em.toFixed(2)+"x"],["Purchase costs (stamp, registration, brokerage)",fmt(R.buy)],["IRR without a loan",pc(R.iU)],["Real IRR without a loan",pc(R.rU)],["Gross rental yield",pc(R.gy)],["Net yield after costs, year 1",pc(R.ny)],["Cash-on-cash, year 1",pc(R.coc)],["Debt service cover, year 1",isFinite(R.dscr)?R.dscr.toFixed(2):"no loan"],["Monthly EMI",fmt(R.emi)],["Total interest paid",fmt(R.totInt)],["Sale value, year "+p.N,fmt(R.exit)],["Net gain, nominal",fmt(R.net)],["Net gain, in today's money",fmt(R.realNet)]].map(([a,b])=>`<div class="m"><span>${a}</span><b>${b}</b></div>`).join("")}</div><p class="hint">Equity multiple = total positive distributions ÷ total equity invested. Total equity invested is your initial equity plus every later negative cash flow (shortfalls, loan top-ups, part-payments). Total positive distributions are all positive cash flows: net rent after loan payments and the net sale proceeds. It is not net profit divided by initial equity.</p>${notes.map(([c,t])=>`<div class="note ${c}">${t}</div>`).join("")}`;
@@ -617,14 +681,16 @@ AS=(ls("wbAssets")||[]).filter(a=>a&&a.r&&a.r.length>1).map(a=>({kind:"pri",src:
 $("inp").addEventListener("click",e=>{if(e.target.dataset&&e.target.dataset.ri!=null){if(sugInf!=null){$("infA").value=sugInf.toFixed(2);ed.delete("infA");infHint();run();renderTable()}return}const id=e.target.dataset&&e.target.dataset.ap;if(!id)return;const k=id=="rate"?"lend":"dep",l=latest(W[k]),m=$(id=="rate"?"hRm":"hFm");if(!l)return;
 if(ed.has(id)){m.textContent="Not applied: you entered this value yourself and it is never overwritten.";return}
 $(id).value=l[1].toFixed(2);ap[id]={k,y:l[0],t:W.st[k].t,s:W.st[k].s};m.textContent="Applied.";run();renderTable()});
-$("cty").onchange=load;$("retry").onclick=load;$("sv").onclick=saveAll;$("pdf").onclick=()=>window.print();$("xls").onclick=()=>{if(!LAST)return;const{p,R}=LAST,P=x=>x*100,n=R.rows.length;
+$("ins").addEventListener("click",e=>{const a=e.target.dataset&&e.target.dataset.iq;if(!a||!infPrompt)return;if(a=="apply"&&infPrompt.sug!=null){$("infA").value=infPrompt.sug.toFixed(2);ed.delete("infA")}infPrompt=null;infHint();run();renderTable()});
+$("cty").onchange=()=>load(true);$("retry").onclick=()=>load(false);$("sv").onclick=saveAll;$("pdf").onclick=()=>window.print();$("xls").onclick=()=>{if(!LAST)return;const{p,R}=LAST,P=x=>x*100,n=R.rows.length;
 const S=[{n:"Summary",r:[["Metric","Value"],["IRR on your cash, with loan (%)",P(R.iL)],["IRR without loan (%)",P(R.iU)],["XIRR with loan, annual cash flows dated on purchase anniversaries (%)",P(R.xL)],["Real IRR with loan (%)",P(R.rL)],["Property value CAGR (%)",P(R.g)],["Equity multiple = total positive distributions / total equity invested",R.em],["Total equity invested (initial equity plus every later negative cash flow)",R.inv],["Total positive distributions",R.dist],["Total interest paid",R.totInt],["Sale value",R.exit],["Capital gains tax",R.cg],["Net gain, nominal",R.net],["Net gain, today's money",R.realNet],["Gross rental yield (%)",P(R.gy)],["Net yield year 1 (%)",P(R.ny)],["Monthly EMI",R.emi]]},
 {n:"Assumptions",r:[["Assumption","Value","Source"],...F.flatMap(([g,fs])=>fs.map(([i,l])=>[l,i=="date0"?p.date0:p[i],ap[i]?"World Bank "+WBC[ap[i].k]+" applied by you, observation year "+ap[i].y:(ed.has(i)?"Entered by you":"Default or estimate")]))]},
 {n:"Annual cash flows",r:[["Year","Inflation %","Inflation basis","Rent after vacancy","Maintenance","Repairs and management","Property tax","Net operating income","Income tax","Loan interest","Loan principal","Cash after loan","Loan balance","Property value"],...R.rows.map((r,i)=>[r.t,p.inf[i],p.src[i],r.eff,-r.mt,-r.ox,-r.pt,r.noi,-r.tax,-r.i,-r.p,r.cf,r.bal,r.v]),[],["Year","Levered cash flow","Unlevered cash flow","Levered, inflation-adjusted"],...R.cfL.map((c,t)=>[t,c,R.cfU[t],c/R.D[t]])]},
 {n:"Loan schedule",r:[["Year","Interest","Principal","Payment","Closing balance"],...R.rows.map(r=>[r.t,r.i,r.p,r.e,r.bal]),[],["Monthly EMI",R.emi],["Loan amount",R.L],["Processing fee",R.fee]]},
 {n:"Asset comparison",r:[["Alternative","Pre-tax %","After-tax %","Alternative ends with","Property ends with","Property ahead by","Tax treatment"],...Object.entries(R.alt).map(([k,a])=>[k,{FD:p.fd,Bonds:p.bond,"Equity mutual fund":p.mf}[k],a.note||a.rn,a.B,a.W,a.nfv,k=="Equity mutual fund"?"Compounds pre-tax; capital gains tax on the realised gain at the end":"Interest taxed every year at slab rate plus cess"])]},
 {n:"Taxes",r:[["Item","Amount"],["Sale date used for the holding-period test",fD(R.saleDate)],["Completed months held",R.heldM],["Holding-period classification",R.lt?"Long-term: held more than 24 months (calendar months)":"Short-term: held 24 months or less (calendar months)"],...R.rows.map(r=>["Rental income tax, year "+r.t,r.tax]),["Sale value after selling costs",R.sale],["Taxable capital gain",Math.max(0,R.gain)],["Capital gains rate incl. cess (%)",P(R.cgr)],["Capital gains tax",R.cg],["Stamp duty, registration and brokerage",R.buy]]},
-...(LASTMA?[{n:"Multi-asset comparison",r:LASTMA}]:[]),{n:"Data sources",r:[["Indicator","Provider","Latest year","Latest value","Status","Retrieved","Note"],...["inf","lend","dep"].map(k=>{const q=(W.st&&W.st[k])||{s:"UNAVAILABLE",t:0},l=latest(W[k]);return[{inf:"Inflation FP.CPI.TOTL.ZG",lend:"Lending rate FR.INR.LEND",dep:"Deposit rate FR.INR.DPST"}[k],"World Bank API",l?l[0]:"none",l?l[1]:"none",q.s,q.t?new Date(q.t).toISOString():(q.s=="BUILT-IN"?"bundled snapshot":""),q.s=="LIVE"?"":(q.err||"")]})]},
+...(LASTMA?[{n:"Multi-asset comparison",r:LASTMA}]:[]),{n:"Inflation used",r:[["Country",cname[W.cc]||W.cc||""],["Source status",(W.st&&W.st.inf?W.st.inf.s:"")],["Latest available observation year",(latest(W.inf)||["none"])[0]],["Latest available observation (%)",(latest(W.inf)||[0,"none"])[1]],["Average of latest five available years (%)",infDefault(W.inf)==null?"n/a":infDefault(W.inf)],["Assumed rate where no data (%)",parseFloat($("infA").value),ed.has("infA")?"USER-EDITED":"ESTIMATED"],[],["Holding year","From","To","Rate used (%)","Calendar years, weights and rates","Source"],...p.infd.map(x=>[x.t,fD(x.from),fD(x.to),x.rate,x.parts.map(q=>q.y+" ("+(q.w*100).toFixed(0)+"%): "+q.r.toFixed(2)+"%"+(q.actual?"":" assumed")).join("; "),x.basis])]},
+{n:"Data sources",r:[["Indicator","Provider","Latest year","Latest value","Status","Retrieved","Note"],...["inf","lend","dep"].map(k=>{const q=(W.st&&W.st[k])||{s:"UNAVAILABLE",t:0},l=latest(W[k]);return[{inf:"Inflation FP.CPI.TOTL.ZG",lend:"Lending rate FR.INR.LEND",dep:"Deposit rate FR.INR.DPST"}[k],"World Bank API",l?l[0]:"none",l?l[1]:"none",q.s,q.t?new Date(q.t).toISOString():(q.s=="BUILT-IN"?"bundled snapshot":""),q.s=="LIVE"?"":(q.err||"")]})]},
 {n:"Asset sources",r:[["Asset","Data type","Provider","Scheme code","Status","Retrieved or imported","First date","Last date","Rows","Rejected rows","Duplicate dates","Price column","Dividend column","Adjusted close used","Return basis","Mutual fund plan","Warnings"],...AS.map(a=>[a.n,KD[a.kind]||a.kind,a.src=="mfapi"?"mfapi.in (third-party service republishing AMFI data, not AMFI directly)":"Imported CSV file",a.code||"",stOf(a),a.t?new Date(a.t).toISOString():"",fD(a.r[0][0]),fD(a.r[a.r.length-1][0]),a.r.length,a.bad||0,a.dups||0,a.cols?a.cols.price:"",a.cols&&a.cols.div?a.cols.div:"",a.adj?"Yes":"No",cls(a).txt,a.kind=="mf"?(a.plan||mfPlan(a.n)):"",(a.warn||[]).join(" | ")])]},
 {n:"Imported data",r:[["Asset","Date","Price or NAV","Cash dividend per unit"],...AS.flatMap(a=>a.r.map(r=>[a.n,fD(r[0]),r[1],r[2]]))]},
 {n:"Tax assumptions",r:[["Assumption or limitation"],...TAXN.map(t=>[t])]}];
@@ -632,6 +698,7 @@ const a=document.createElement("a");a.href=URL.createObjectURL(xlsx(S));a.downlo
 $("tests").onclick=async()=>{const t=[...selfTest(),...await selfTestNet()],p=t.filter(x=>x[1]).length;$("tr").innerHTML=`<div class="note ${p==t.length?"ok":"bad"}"><b>${p} of ${t.length} formula tests passed</b><br>${t.map(x=>(x[1]?"Pass: ":"FAIL: ")+x[0]+(x[2]?" ("+x[2]+")":"")).join("<br>")}</div>`};
 (async()=>{let list=ls("wbList")||[["IND","India","IN"],["USA","United States","US"],["GBR","United Kingdom","GB"],["ARE","United Arab Emirates","AE"],["AUS","Australia","AU"],["SGP","Singapore","SG"],["DEU","Germany","DE"]];
 try{const j=await(await fetch(WBU+"country?format=json&per_page=400")).json(),l=j[1].filter(c=>c.region&&c.region.value!="Aggregates").map(c=>[c.id,c.name,c.iso2Code]).sort((a,b)=>a[1].localeCompare(b[1]));if(l.length>50){list=l;ls("wbList",l)}}catch(e){}
+list.forEach(c=>{cname[c[0]]=c[1]});
 $("cty").innerHTML=list.map(c=>`<option value="${c[0]}">${c[1]}</option>`).join("");$("cty").value="IND";load()})();
 </script>
 </body>
